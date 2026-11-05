@@ -1,0 +1,64 @@
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const metric=(n)=>({state:'ok',all:n*2,total:[n,n],youth:[n*2,n*2],ageBands:Object.fromEntries(Array.from({length:9},(_,i)=>[String((i+1)*10),[n+i,n+i+1]]))});
+function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(month>='202607'?['11','12']:['11','29','46']).map((code,i)=>({code,name:code==='11'?'서울':code==='12'?'전남광주통합특별시':code==='29'?'광주':'전남',inbound:metric(i+10),outbound:metric(i+11)}))};}
+(async()=>{
+  const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  const errors=[];const page=await browser.newPage({acceptDownloads:true});page.on('pageerror',e=>errors.push(e.message));
+  let calls=[],failMonth='',hold=false;
+  await page.addInitScript(()=>localStorage.setItem('jeju-gas-url','https://script.google.com/macros/s/legacy/exec'));
+  await page.route('https://script.google.com/**',async route=>{
+    const u=new URL(route.request().url()),month=u.searchParams.get('month');
+    assert(!u.pathname.includes('/legacy/'));
+    if(hold && month){await new Promise(r=>setTimeout(r,800));}
+    if(month)calls.push(month);
+    const payload=u.searchParams.has('action')?{ok:true,keyConfigured:true,features:['ageBands']}:month===failMonth?{ok:false,error:'테스트용 조회 오류'}:fixture(month);
+    try{await route.fulfill({contentType:'application/javascript',body:`${u.searchParams.get('callback')}(${JSON.stringify(payload)});`});}catch(_){}
+  });
+  await page.goto('http://127.0.0.1:8000/');
+  await page.waitForFunction(()=>document.querySelector('#api-status').textContent==='API 연결됨');
+  assert.equal(await page.locator('#settings,#endpoint').count(),0);
+  assert.equal(await page.locator('#age option').count(),11);
+  await page.fill('#month','2026-09');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);
+  assert.equal(await page.locator('#inbound').innerText(),'42');
+  await page.selectOption('#age','90');assert.equal(await page.locator('#inbound').innerText(),'76');
+  await page.selectOption('#sex','1');assert.equal(await page.locator('#inbound').innerText(),'39');
+  assert.equal(calls.length,1);console.log('PASS monthly decade and sex filters use loaded data');
+  await page.selectOption('#age','all');await page.selectOption('#sex','both');
+  await page.selectOption('#mode','year');assert.equal(await page.locator('#month-field').isVisible(),false);
+  await page.selectOption('#year','2026');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);
+  assert.equal(await page.locator('#annual-rows tr').count(),12);
+  assert.equal(await page.locator('#rows tr').count(),2);
+  assert.equal(await page.locator('#inbound').innerText(),'564'); // 6*66 + 4*42
+  assert.equal(await page.locator('#inCoverage').innerText(),'확인 10 / 10개월');
+  assert((await page.locator('#annual-rows tr').nth(10).innerText()).includes('조회기간 밖'));
+  assert((await page.locator('#label').innerText()).includes('1~10월'));
+  assert(!(await page.locator('#status').innerText()).includes('추가 조회 중'));
+  assert.equal(calls.filter(m=>m.startsWith('2025')).length,12);
+  assert.equal(calls.filter(m=>m.startsWith('2026')).length,10);
+  console.log('PASS annual 12 months, matched-period totals, merger boundary and per-month caching');
+  const downloadPromise=page.waitForEvent('download');await page.click('#csv');const download=await downloadPromise;const file=await download.path();const csv=fs.readFileSync(file,'utf8');
+  assert(csv.includes('202601~202610'));assert(csv.includes('광주·전남(통합 기준)'));assert(csv.includes('전년 전입'));assert(csv.includes('조회기간 밖'));
+  console.log('PASS annual CSV contains regional and monthly comparisons');
+  failMonth='202403';await page.selectOption('#year','2024');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);
+  assert.equal(await page.locator('#inbound').innerText(),'—');
+  assert((await page.locator('#annual-rows tr').nth(2).innerText()).includes('조회 오류'));
+  assert((await page.locator('#inCompare').innerText()).includes('—'));
+  assert(!calls.some(m=>m.startsWith('2023')));
+  assert.equal(await page.locator('#inCoverage').innerText(),'확인 11 / 12개월');
+  console.log('PASS failed month remains missing; unsupported previous year is not requested');
+  failMonth='';hold=true;await page.selectOption('#year','2026'); // cached year is fast: change month to uncached 2024-03 instead
+  await page.selectOption('#mode','month');await page.fill('#month','2024-03');await page.click('#load');await page.click('#cancel');
+  await page.waitForFunction(()=>!document.querySelector('#load').disabled);
+  assert((await page.locator('#status').innerText()).includes('중단'));
+  await page.waitForTimeout(1200);
+  console.log('PASS cancellation restores controls, retains previous result, and ignores late JSONP');
+  await page.setViewportSize({width:390,height:844});await page.selectOption('#mode','year');await page.click('#demo');
+  assert.equal(await page.locator('#annual-rows tr').count(),12);assert.equal(await page.locator('#csv').isDisabled(),true);
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+  await page.screenshot({path:'/tmp/jeju-annual-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:1000});await page.screenshot({path:'/tmp/jeju-annual-desktop.png',fullPage:true});
+  assert.deepEqual(errors,[]);console.log('PASS mobile overflow, annual demo, no JS errors');
+  await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
