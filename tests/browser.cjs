@@ -16,6 +16,14 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
     const payload=u.searchParams.has('action')?{ok:true,keyConfigured:true,features:['ageBands']}:month===failMonth?{ok:false,error:'테스트용 조회 오류'}:fixture(month);
     try{await route.fulfill({contentType:'application/javascript',body:`${u.searchParams.get('callback')}(${JSON.stringify(payload)});`});}catch(_){}
   });
+  // Simulate a browser/CDN retaining the pre-period version of the stable JS URL.
+  await page.route('**/migration.js*',route=>{
+    if(!new URL(route.request().url()).search) {
+      const old=fs.readFileSync('migration.js','utf8').replace(',periodReport,monthRange','');
+      return route.fulfill({contentType:'application/javascript',body:old});
+    }
+    return route.continue();
+  });
   await page.goto('http://127.0.0.1:8000/');
   await page.waitForFunction(()=>document.querySelector('#api-status').textContent==='API 연결됨');
   assert.equal(await page.locator('#settings,#endpoint').count(),0);
