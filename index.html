@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제주 인구이동 대시보드</title>
+<style>
+:root{color-scheme:light;--ink:#162d2a;--muted:#526a65;--green:#086950;--blue:#265a8e;--line:#dce8e3;--bg:#f2f7f4}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto}
+header{background:#123e35;color:#fff;border-radius:24px;padding:32px clamp(20px,5vw,54px);border-bottom:5px solid #6ec5a3}
+h1{font-size:clamp(27px,5vw,45px);letter-spacing:-.05em;margin:4px 0}header p{color:#d6eee6;margin:4px 0}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.14em;color:#a3e0c8}
+.panel,.card{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:16px}
+form,.toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:12px}label{display:grid;gap:5px;font-weight:650}
+input,select,button{font:inherit;border:1px solid #a8c2b7;border-radius:8px;padding:9px 12px;min-height:42px;background:white;color:var(--ink)}
+button{cursor:pointer;font-weight:700}button.primary{background:var(--green);color:white;border-color:var(--green)}button:disabled{opacity:.5;cursor:default}
+details{margin-top:12px}summary{cursor:pointer;color:var(--green)}details input{width:min(100%,530px)}details form{margin-top:10px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card strong{display:block;font-size:clamp(22px,4vw,36px);font-variant-numeric:tabular-nums}
+small,.sub,footer{color:var(--muted)}h2{margin:0;font-size:20px}.toolbar{justify-content:space-between;align-items:center}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:right;font-variant-numeric:tabular-nums}th:first-child,td:first-child{text-align:left}thead{background:#edf5f0}
+.pos{color:var(--green)}.neg{color:#9b3e26}.bar{display:inline-block;height:6px;border-radius:4px;background:currentColor;vertical-align:middle;margin-left:7px}#status{min-height:24px;margin-bottom:0}footer{margin:18px 2px}a{color:var(--green)}
+@media(max-width:560px){main{margin:16px auto}.cards{gap:6px}.card{padding:10px}.panel{padding:14px}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="eyebrow">JEJU · MIGRATION MONITOR</div><h1>제주 인구이동 대시보드</h1><p>타 시도와 제주 사이의 월별 전입·전출·순이동</p></header>
+<section class="panel" aria-label="조회 설정">
+<form id="query">
+<label>기준월 <input id="month" type="month" min="2024-01" required></label>
+<label>연령 <select id="age"><option value="all">전체 연령</option><option value="youth">만 20~39세</option></select></label>
+<label>성별 <select id="sex"><option value="both">전체</option><option value="0">남성</option><option value="1">여성</option></select></label>
+<button class="primary" id="load">API 조회</button><button type="button" id="demo">예시 보기</button>
+</form>
+<details id="settings"><summary>Apps Script 연결 설정</summary>
+<form id="connection"><label style="flex:1;min-width:min(100%,310px)">웹 앱 URL <input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/…/exec" required></label><button>저장 및 연결 확인</button></form>
+</details>
+<p id="status" role="status">Apps Script 웹 앱을 연결하거나 예시 데이터를 확인하세요.</p>
+</section>
+<section class="cards" aria-label="선택 월 이동 요약">
+<div class="card">전입<strong id="inbound">—</strong><small id="inCoverage"></small></div>
+<div class="card">전출<strong id="outbound">—</strong><small id="outCoverage"></small></div>
+<div class="card">순이동<strong id="net">—</strong><small>전입 − 전출</small></div>
+</section>
+<section class="panel">
+<div class="toolbar"><div><h2>시도별 이동</h2><div class="sub" id="label">기준월을 조회하면 표가 표시됩니다.</div></div><button id="csv" disabled>CSV 내려받기</button></div>
+<div class="table-wrap"><table><thead><tr><th scope="col">상대 시도</th><th scope="col">제주 전입</th><th scope="col">제주 전출</th><th scope="col">순이동</th><th scope="col">자료 상태</th></tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+<footer>단위 명 · 제주 내부 이동 제외 · 자료 없음과 조회 오류는 —로 표시 · <a href="https://www.data.go.kr/data/15108093/openapi.do">행정안전부 지역별 인구이동 현황</a></footer>
+</main>
+<script>
+'use strict';
+// GitHub Pages 방문자 모두에게 동일한 서버를 연결하려면 아래에 /exec URL을 넣으세요.
+const DEFAULT_ENDPOINT = '';
+const $ = id => document.getElementById(id);
+let result = null;
+let currentRows = [];
+let busy = false;
+const fmt = new Intl.NumberFormat('ko-KR');
+const display = n => n === null ? '—' : fmt.format(n);
+const signed = n => n > 0 ? '+' + display(n) : display(n);
+const kst = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date());
+const [year,month] = kst.split('-').map(Number);
+const previous = new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7);
+$('month').max = previous;
+$('month').value = previous;
+try {$('endpoint').value = localStorage.getItem('jeju-gas-url') || DEFAULT_ENDPOINT;} catch (_) {$('endpoint').value=DEFAULT_ENDPOINT;}
+$('settings').open = !$('endpoint').value;
+function call(params) {
+  const url = new URL($('endpoint').value.trim());
+  if (url.origin !== 'https://script.google.com' || !/^\/macros\/s\/[\w-]+\/exec$/.test(url.pathname) || url.search || url.hash) {
+    throw Error('Google Apps Script 웹 앱의 /exec URL을 입력하세요.');
+  }
+  const name = 'jejuCb_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  url.search = new URLSearchParams({...params,callback:name});
+  return new Promise((resolve,reject)=>{
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>finish(Error('서버 응답 시간이 초과되었습니다.')),55000);
+    function finish(err,data) {
+      clearTimeout(timer);
+      script.remove();
+      delete window[name];
+      err ? reject(err) : resolve(data);
+    }
+    window[name] = data => finish(data.ok ? null : Error(data.error),data);
+    script.onerror = ()=>finish(Error('웹 앱에 연결하지 못했습니다. /exec 주소와 익명 접근 권한을 확인하세요.'));
+    script.src = url;
+    document.head.append(script);
+  });
+}
+async function run(message, fn) {
+  if (busy) return;
+  busy = true;
+  $('load').disabled = $('demo').disabled = $('connection').querySelector('button').disabled = true;
+  $('status').textContent = message;
+  try { await fn(); } catch (e) { $('status').textContent = e.message; }
+  finally { busy = false; $('load').disabled = $('demo').disabled = $('connection').querySelector('button').disabled = false; }
+}
+$('connection').onsubmit = e => {
+  e.preventDefault();
+  run('연결 확인 중…', async()=>{
+    const data = await call({action:'health'});
+    if (!data.keyConfigured) throw Error('웹 앱 연결은 확인했습니다. Apps Script에 DATA_GO_KR_SERVICE_KEY를 설정하세요.');
+    try {localStorage.setItem('jeju-gas-url',$('endpoint').value.trim());} catch (_) {}
+    $('status').textContent = '웹 앱 연결과 인증키 설정을 확인했습니다. 기준월을 조회하세요.';
+  });
+};
+$('query').onsubmit = e => {
+  e.preventDefault();
+  if (!$('endpoint').value.trim()) {$('settings').open=true; $('endpoint').focus(); return;}
+  run('시도별 전입·전출 자료를 불러오는 중…',async()=>{
+    result = await call({month:$('month').value.replace('-','')});
+    render();
+  });
+};
+$('age').onchange = $('sex').onchange = () => {if(result)render();};
+$('demo').onclick = () => {
+  const names = '서울 부산 대구 인천 광주 대전 울산 세종 경기 강원 충북 충남 전북 전남 경북 경남'.split(' ');
+  const demo = n => ({state:'ok',all:n*3+7,total:[n*2+7,n],youth:[Math.floor(n*.7),Math.floor(n*.5)]});
+  result = {month:'202609',demo:true,rows:names.map((name,i)=>({name,inbound:demo(21+(i*37)%92),outbound:demo(13+(i*31)%108)}))};
+  render();
+};
+function render() {
+  const age = $('age').value, sex = $('sex').value;
+  const read = r => {
+    if(r.state !== 'ok') return null;
+    if(age==='all') return sex==='both' ? r.all : r.total[sex];
+    return sex==='both' ? (r.youth.includes(null) ? null : r.youth[0]+r.youth[1]) : r.youth[sex];
+  };
+  const state = (r,n) => n!==null ? '정상' : r.state==='empty' ? '자료 없음' : r.reason || '선택 지표 필드 없음';
+  currentRows = result.rows.map(r=>{
+    const a=read(r.inbound), b=read(r.outbound);
+    return {name:r.name,a,b,net:a===null||b===null?null:a-b,ins:state(r.inbound,a),outs:state(r.outbound,b)};
+  }).sort((a,b)=>(b.a??-1)-(a.a??-1));
+  const sums = ['a','b'].map(key=>{
+    const nums=currentRows.map(r=>r[key]).filter(n=>n!==null);
+    return {count:nums.length,total:nums.length===result.rows.length?nums.reduce((a,b)=>a+b,0):null};
+  });
+  $('inbound').textContent=display(sums[0].total);
+  $('outbound').textContent=display(sums[1].total);
+  $('net').textContent=sums.some(s=>s.total===null)?'—':signed(sums[0].total-sums[1].total);
+  $('inCoverage').textContent='확인 '+sums[0].count+' / '+result.rows.length+'개 시도';
+  $('outCoverage').textContent='확인 '+sums[1].count+' / '+result.rows.length+'개 시도';
+  $('label').textContent=result.month.slice(0,4)+'년 '+Number(result.month.slice(4))+'월 · '+$('age').selectedOptions[0].text+' · '+$('sex').selectedOptions[0].text;
+  $('status').textContent = result.demo ? '예시 데이터입니다. 실제 통계와 구분해 주세요.' :
+    sums.every(s=>s.total!==null) ? '조회 완료 · '+new Date(result.asOf).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' 기준' :
+    '일부 시도 또는 지표를 확인할 수 없어 해당 합계와 순이동을 비웠습니다.';
+  const max = Math.max(1,...currentRows.map(r=>Math.abs(r.net??0)));
+  $('rows').replaceChildren(...currentRows.map(r=>{
+    const tr=document.createElement('tr');
+    const values=[r.name,display(r.a),display(r.b),signed(r.net),r.ins==='정상'&&r.outs==='정상'?'정상':'전입 '+r.ins+' · 전출 '+r.outs];
+    values.forEach((value,i)=>{
+      const td=document.createElement(i===0?'th':'td');
+      if(i===0) td.scope='row';
+      td.textContent=value;
+      if(i===3 && r.net) {
+        td.className=r.net>0?'pos':'neg';
+        const bar=document.createElement('span');
+        bar.className='bar'; bar.style.width=(Math.abs(r.net)/max*52)+'px';
+        bar.setAttribute('aria-hidden','true'); td.append(bar);
+      }
+      tr.append(td);
+    });
+    return tr;
+  }));
+  $('csv').disabled=result.demo;
+}
+$('csv').onclick=()=>{
+  const lines=[['기준월','연령','성별','상대 시도','전입','전출','순이동','전입 상태','전출 상태'],
+    ...currentRows.map(r=>[result.month,$('age').selectedOptions[0].text,$('sex').selectedOptions[0].text,r.name,r.a,r.b,r.net,r.ins,r.outs])];
+  const csv=lines.map(row=>row.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a'); a.href=url; a.download='jeju-migration-'+result.month+'-'+$('age').value+'-'+$('sex').value+'.csv';
+  a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+</script>
+</body>
+</html>
