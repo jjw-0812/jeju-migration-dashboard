@@ -40,8 +40,21 @@
     return {a,b,net:difference(a,b),countA:rows.filter(r=>r.a!==null).length,
       countB:rows.filter(r=>r.b!==null).length,count:rows.length};
   }
-  function annualReport(slots, limit, age, sex) {
-    const months = Array.from({length:12},(_,i)=>{
+  function monthRange(start, end, latest) {
+    const valid = value => /^20\d{2}-(0[1-9]|1[0-2])$/.test(value);
+    if (!valid(start) || !valid(end)) throw Error('시작연월과 종료연월을 선택해 주세요.');
+    if (start < '2024-01' || end > latest) throw Error('2024년 1월부터 지난달까지 선택할 수 있습니다.');
+    if (start > end) throw Error('종료연월은 시작연월보다 빠를 수 없습니다.');
+    const months=[];
+    let year=Number(start.slice(0,4)), month=Number(start.slice(5));
+    while (`${year}-${String(month).padStart(2,'0')}` <= end) {
+      months.push(String(year)+String(month).padStart(2,'0'));
+      if (++month===13) {year++;month=1;}
+    }
+    return months;
+  }
+  function periodReport(slots, limit, age, sex) {
+    const months = Array.from({length:slots.length},(_,i)=>{
       const slot = slots[i];
       const rows = monthRows(slot?.data,age,sex,true);
       const total = totals(rows);
@@ -62,7 +75,10 @@
     return {months,rows,a,b,net:difference(a,b),limit,
       countA:selected.filter(m=>m.a!==null).length,countB:selected.filter(m=>m.b!==null).length};
   }
-  const api = {sum,difference,read,reason,monthRows,totals,annualReport};
+  function annualReport(slots, limit, age, sex) {
+    return periodReport(Array.from({length:12},(_,i)=>slots[i] || null),limit,age,sex);
+  }
+  const api = {sum,difference,read,reason,monthRows,totals,annualReport,periodReport,monthRange};
   if (typeof module !== 'undefined' && module.exports) module.exports=api;
   else root.MigrationData=api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

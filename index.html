@@ -31,9 +31,11 @@ small,.sub,footer{color:var(--muted)}h2{margin:0;font-size:20px}.toolbar{justify
 <header><div class="eyebrow">JEJU · MIGRATION MONITOR</div><h1>제주 인구이동 대시보드</h1><p>타 시도와 제주 사이의 전입·전출·순이동 · 연령대별·연간 비교</p></header>
 <section class="panel" aria-label="조회 설정">
 <form id="query">
-<label>조회 기간 <select id="mode"><option value="month">월별 현황</option><option value="year">연간 · 전년도 비교</option></select></label>
+<label>조회 기간 <select id="mode"><option value="month">월별 현황</option><option value="year">연간 · 전년도 비교</option><option value="range">기간 선택 · 전년도 비교</option></select></label>
 <label id="month-field">기준월 <input id="month" type="month" min="2024-01" required></label>
 <label id="year-field" hidden>기준연도 <select id="year"></select></label>
+<label id="start-field" hidden>시작연월 <input id="start" type="month" min="2024-01"></label>
+<label id="end-field" hidden>종료연월 <input id="end" type="month" min="2024-01"></label>
 <label>연령 <select id="age"><option value="all">전체 연령</option><option value="youth">만 20~39세</option><option value="10">10대 (10~19세)</option><option value="20">20대 (20~29세)</option><option value="30">30대 (30~39세)</option><option value="40">40대 (40~49세)</option><option value="50">50대 (50~59세)</option><option value="60">60대 (60~69세)</option><option value="70">70대 (70~79세)</option><option value="80">80대 (80~89세)</option><option value="90">90대 (90~99세)</option></select></label>
 <label>성별 <select id="sex"><option value="both">전체</option><option value="0">남성</option><option value="1">여성</option></select></label>
 <button class="p-solid" id="load" type="submit">조회하기</button><button type="button" id="demo">예시 보기</button><button type="button" id="cancel" hidden>조회 중단</button>
@@ -76,6 +78,9 @@ const previous = new Date(Date.UTC(nowYear,nowMonth-2,1)).toISOString().slice(0,
 const latestYear = Number(previous.slice(0,4)), latestMonth = Number(previous.slice(5));
 $('month').max = previous;
 $('month').value = previous;
+$('start').max = $('end').max = previous;
+$('start').value = String(latestYear)+'-01';
+$('end').value = previous;
 for (let y=latestYear;y>=2024;y--) {
   const option=document.createElement('option'); option.value=y; option.textContent=y+'년'; $('year').append(option);
 }
@@ -118,10 +123,32 @@ async function fetchMonth(month,signal) {
   return data;
 }
 function updatePeriod() {
-  const annual=$('mode').value==='year';
-  $('month-field').hidden=annual;$('year-field').hidden=!annual;$('month').required=!annual;
+  const mode=$('mode').value;
+  $('month-field').hidden=mode!=='month';$('year-field').hidden=mode!=='year';
+  $('start-field').hidden=$('end-field').hidden=mode!=='range';
+  $('month').required=mode==='month';$('start').required=$('end').required=mode==='range';
+  $('month').disabled=mode!=='month';$('year').disabled=mode!=='year';
+  $('start').disabled=$('end').disabled=mode!=='range';
+  $('end').setCustomValidity('');
 }
 $('mode').onchange=updatePeriod;
+updatePeriod();
+function validateRange() {
+  $('end').setCustomValidity($('start').value && $('end').value && $('start').value>$('end').value
+    ? '종료연월은 시작연월보다 빠를 수 없습니다.' : '');
+}
+$('start').oninput=$('end').oninput=validateRange;
+function comparisonPlan() {
+  if($('mode').value==='range') {
+    const months=M.monthRange($('start').value,$('end').value,previous);
+    return {kind:'range',limit:months.length,months,priorMonths:months.map(m=>String(Number(m.slice(0,4))-1)+m.slice(4))};
+  }
+  const year=Number($('year').value),limit=year===latestYear?latestMonth:12;
+  const months=Array.from({length:12},(_,i)=>String(year)+String(i+1).padStart(2,'0'));
+  return {kind:'year',year,limit,months,priorMonths:months.map(m=>String(year-1)+m.slice(4))};
+}
+const monthLabel=month=>month.slice(0,4)+'년 '+Number(month.slice(4))+'월';
+const periodLabel=(months,limit)=>monthLabel(months[0])+(limit>1?' ~ '+monthLabel(months[limit-1]):'');
 $('cancel').onclick=()=>controller?.abort();
 async function checkConnection() {
   try {const data=await call({action:'health'});$('api-status').textContent=data.keyConfigured?'API 연결됨':'API 연결 확인 실패';}
@@ -131,7 +158,7 @@ checkConnection();
 $('query').onsubmit=async e=>{
   e.preventDefault();if(controller)return;
   controller=new AbortController();const signal=controller.signal;
-  const controls=['mode','year','month','load','demo'];
+  const controls=['mode','year','month','start','end','load','demo'];
   controls.forEach(id=>$(id).disabled=true);$('cancel').hidden=false;$('csv').disabled=true;
   try {
     if($('mode').value==='month') {
@@ -139,29 +166,29 @@ $('query').onsubmit=async e=>{
       const data=await fetchMonth($('month').value.replace('-',''),signal);
       result={kind:'month',data};
     } else {
-      const year=Number($('year').value),limit=year===latestYear?latestMonth:12;
-      const current=Array(12).fill(null),prior=Array(12).fill(null);
+      const plan=comparisonPlan();
+      const current=Array(plan.months.length).fill(null),prior=Array(plan.priorMonths.length).fill(null);
       const jobs=[];
-      for(let i=0;i<12;i++) {
-        if(i<limit)jobs.push({year,index:i,target:current});
-        if(year>2024)jobs.push({year:year-1,index:i,target:prior});
-      }
+      plan.months.forEach((month,index)=>{
+        if(index<plan.limit)jobs.push({month,index,target:current});
+        if(plan.priorMonths[index]>='202401')jobs.push({month:plan.priorMonths[index],index,target:prior});
+      });
       let done=0;
       for(const job of jobs) {
-        const month=String(job.year)+String(job.index+1).padStart(2,'0');
-        $('status').textContent=`연간 조회 ${done}/${jobs.length} · ${job.year}년 ${job.index+1}월 조회 중…`;
+        const month=job.month;
+        $('status').textContent=`기간 조회 ${done}/${jobs.length} · ${monthLabel(month)} 조회 중…`;
         try {job.target[job.index]={data:await fetchMonth(month,signal)};}
         catch(err){if(err.name==='AbortError')throw err;job.target[job.index]={error:err.message};}
         done++;
       }
       if(signal.aborted)throw new DOMException('조회 중단','AbortError');
-      result={kind:'year',year,limit,current,prior};
+      result={...plan,current,prior};
     }
     render();
   } catch(err) {
     $('status').textContent=err.name==='AbortError'?'조회를 중단했습니다. 이전 조회 결과는 유지됩니다.':err.message;
   } finally {
-    controller=null;controls.forEach(id=>$(id).disabled=false);$('cancel').hidden=true;
+    controller=null;controls.forEach(id=>$(id).disabled=false);updatePeriod();$('cancel').hidden=true;
     $('csv').disabled=!result || !!result.demo;
   }
 };
@@ -178,10 +205,11 @@ function demoMonth(month) {
   return {ok:true,month,asOf:new Date().toISOString(),rows:regions.map(([code,name],i)=>({code,name,inbound:metric(n+i*3),outbound:metric(n+i*2+3)}))};
 }
 $('demo').onclick=()=>{
-  if($('mode').value==='year') {
-    const year=Number($('year').value),limit=year===latestYear?latestMonth:12;
-    const months=y=>Array.from({length:12},(_,i)=>({data:demoMonth(String(y)+String(i+1).padStart(2,'0'))}));
-    result={kind:'year',demo:true,year,limit,current:months(year).map((s,i)=>i<limit?s:null),prior:year>2024?months(year-1):Array(12).fill(null)};
+  if($('mode').value!=='month') {
+    let plan;
+    try {plan=comparisonPlan();} catch(err){$('status').textContent=err.message;return;}
+    result={...plan,demo:true,current:plan.months.map((month,i)=>i<plan.limit?{data:demoMonth(month)}:null),
+      prior:plan.priorMonths.map(month=>month>='202401'?{data:demoMonth(month)}:null)};
   } else result={kind:'month',demo:true,data:demoMonth($('month').value.replace('-',''))};
   render();
 };
@@ -194,45 +222,49 @@ function appendRow(target,values) {
   });
   target.append(tr);return tr;
 }
-function drawChart(current,prior,limit) {
+function drawChart(current,prior,limit,labels) {
   const ns='http://www.w3.org/2000/svg';
   const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 900 260');svg.setAttribute('role','img');
   const title=document.createElementNS(ns,'title');title.textContent='월별 순이동: 선택 연도와 전년도 비교';svg.append(title);
   const values=[...current.slice(0,limit),...prior].map(m=>m.net).filter(Number.isSafeInteger);
   const low=Math.min(0,...values),high=Math.max(0,...values),range=high-low || 1;
-  const x=i=>65+i*70,y=n=>215-(n-low)/range*175;
+  const width=Math.max(900,labels.length*70+130);
+  svg.setAttribute('viewBox',`0 0 ${width} 260`);
+  svg.style.minWidth=width+'px';
+  const x=i=>65+(labels.length===1?0:i*(width-130)/(labels.length-1)),y=n=>215-(n-low)/range*175;
   function line(x1,y1,x2,y2,color){const el=document.createElementNS(ns,'line');Object.entries({x1,y1,x2,y2,stroke:color}).forEach(([k,v])=>el.setAttribute(k,v));svg.append(el);}
   function text(x,y,value){const el=document.createElementNS(ns,'text');el.setAttribute('x',x);el.setAttribute('y',y);el.setAttribute('font-size','12');el.setAttribute('fill','#526a65');el.textContent=value;svg.append(el);}
-  line(55,y(0),850,y(0),'#a8c2b7');text(5,y(high)+4,display(high));if(low!==high)text(5,y(low)+4,display(low));
-  for(let i=0;i<12;i++)text(x(i)-10,245,(i+1)+'월');
-  for(const [months,color,count] of [[prior,'#265a8e',12],[current,'#086950',limit]]) {
+  line(55,y(0),width-45,y(0),'#a8c2b7');text(5,y(high)+4,display(high));if(low!==high)text(5,y(low)+4,display(low));
+  for(let i=0;i<labels.length;i++)text(x(i)-18,245,labels[i]);
+  for(const [months,color,count] of [[prior,'#265a8e',prior.length],[current,'#086950',limit]]) {
     let previous=null;
     for(let i=0;i<count;i++){
       const n=months[i].net;if(!Number.isSafeInteger(n)){previous=null;continue;}
       if(previous)line(x(previous.i),y(previous.n),x(i),y(n),color);
       const point=document.createElementNS(ns,'circle');point.setAttribute('cx',x(i));point.setAttribute('cy',y(n));point.setAttribute('r','4');point.setAttribute('fill',color);
-      const tooltip=document.createElementNS(ns,'title');tooltip.textContent=`${i+1}월 ${signed(n)}명`;point.append(tooltip);svg.append(point);previous={i,n};
+      const tooltip=document.createElementNS(ns,'title');tooltip.textContent=`${labels[i]} ${signed(n)}명`;point.append(tooltip);svg.append(point);previous={i,n};
     }
   }
   $('annual-chart').replaceChildren(svg);
 }
 function render() {
   if(!result)return;
-  const age=$('age').value,sex=$('sex').value,annual=result.kind==='year';
+  const age=$('age').value,sex=$('sex').value,annual=result.kind!=='month';
   const filter=$('age').selectedOptions[0].text+' · '+$('sex').selectedOptions[0].text;
   $('annual-panel').hidden=!annual;
   document.querySelectorAll('.annual-only').forEach(el=>el.hidden=!annual);
   ['inCompare','outCompare','netCompare'].forEach(id=>$(id).textContent='');
   let summary,previousSummary=null;
   if(annual){
-    const current=M.annualReport(result.current,result.limit,age,sex),prior=M.annualReport(result.prior,result.limit,age,sex);
+    const current=M.periodReport(result.current,result.limit,age,sex),prior=M.periodReport(result.prior,result.limit,age,sex);
     annualView={current,prior};summary=current;previousSummary=prior;
     currentRows=current.rows.map(row=>({...row,priorNet:prior.rows.find(r=>r.code===row.code)?.net ?? null}));
-    const period=`${result.year}년 1~${result.limit}월`;
+    const period=result.kind==='year'?`${result.year}년 1~${result.limit}월`:periodLabel(result.months,result.limit);
+    const priorPeriod=periodLabel(result.priorMonths,result.limit);
     $('region-title').textContent='시도별 누계 · 전년도 비교';
     $('label').textContent=period+' · '+filter+' · 광주·전남은 통합 기준 합산';
-    $('annual-label').textContent=`${period} 누계와 ${result.year-1}년 같은 기간 비교 · ${filter}`;
-    $('current-legend').textContent=result.year+'년 순이동';$('prior-legend').textContent=(result.year-1)+'년 순이동';
+    $('annual-label').textContent=`${period} 누계 · 전년 ${priorPeriod} 비교 · ${filter}`;
+    $('current-legend').textContent=(result.kind==='year'?result.year+'년':period)+' 순이동';$('prior-legend').textContent=(result.kind==='year'?(result.year-1)+'년':priorPeriod)+' 순이동';
     $('inCoverage').textContent=`확인 ${current.countA} / ${result.limit}개월`;
     $('outCoverage').textContent=`확인 ${current.countB} / ${result.limit}개월`;
     for(const [id,key] of [['inCompare','a'],['outCompare','b'],['netCompare','net']])$(id).textContent=`전년 동기간 ${display(prior[key])}명 · 증감 ${signed(M.difference(current[key],prior[key]))}명`;
@@ -241,9 +273,9 @@ function render() {
       const p=prior.months[i],active=i<result.limit;
       const status= !active?'조회기간 밖':m.error?'조회 오류':m.a===null || m.b===null?'자료 일부 없음':'정상';
       const priorStatus=p.error?'전년 조회 오류':p.a===null || p.b===null?'전년 자료 없음':'';
-      appendRow($('annual-rows'),[i+1+'월',display(active?m.a:null),display(active?m.b:null),signed(active?m.net:null),display(p.a),display(p.b),signed(p.net),signed(active?M.difference(m.net,p.net):null),[status,priorStatus].filter(Boolean).join(' · ')]);
+      appendRow($('annual-rows'),[result.kind==='year'?i+1+'월':monthLabel(result.months[i]),display(active?m.a:null),display(active?m.b:null),signed(active?m.net:null),display(p.a),display(p.b),signed(p.net),signed(active?M.difference(m.net,p.net):null),[status,priorStatus].filter(Boolean).join(' · ')]);
     });
-    drawChart(current.months,prior.months,result.limit);
+    drawChart(current.months,prior.months,result.limit,result.months.map((m,i)=>result.kind==='year'?i+1+'월':m.slice(2,4)+'.'+m.slice(4)));
   }else{
     annualView=null;currentRows=M.monthRows(result.data,age,sex);summary=M.totals(currentRows);
     $('region-title').textContent='시도별 이동';
@@ -265,17 +297,17 @@ function render() {
   $('status').textContent=result.demo?'예시 데이터입니다. 실제 통계와 구분해 주세요.':missing
     ?'일부 자료를 확인할 수 없어 해당 합계와 순이동을 비웠습니다.'
     :annual && (previousSummary.a===null || previousSummary.b===null)?'조회 완료 · 전년도 자료가 부족해 비교값 일부를 비웠습니다.'
-    :annual?'연간 조회 완료 · 전년도 같은 기간 비교': '조회 완료 · '+new Date(result.data.asOf).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' 기준';
+    :annual?'기간 조회 완료 · 전년도 같은 기간 비교': '조회 완료 · '+new Date(result.data.asOf).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' 기준';
   $('csv').disabled=!!controller || !!result.demo;
 }
 $('csv').onclick=()=>{
   if(!result || result.demo || controller)return;
   const age=$('age').selectedOptions[0].text,sex=$('sex').selectedOptions[0].text;
-  const period=result.kind==='year'?`${result.year}01~${result.year}${String(result.limit).padStart(2,'0')}`:result.data.month;
+  const period=result.kind!=='month'?result.months[0]+'~'+result.months[result.limit-1]:result.data.month;
   const lines=[['집계기간','연령','성별','상대 시도','전입','전출','순이동',...(annualView?['전년 순이동','순이동 증감']:[]),'전입 상태','전출 상태'],
     ...currentRows.map(r=>[period,age,sex,r.name,r.a,r.b,r.net,...(annualView?[r.priorNet,M.difference(r.net,r.priorNet)]:[]),r.ins,r.outs])];
-  if(annualView){lines.push([],['연도','월','연령','성별','전입','전출','순이동','전년 전입','전년 전출','전년 순이동','순이동 증감','자료 상태']);
-    annualView.current.months.forEach((m,i)=>{const p=annualView.prior.months[i],active=i<result.limit;lines.push([result.year,i+1,age,sex,active?m.a:null,active?m.b:null,active?m.net:null,p.a,p.b,p.net,active?M.difference(m.net,p.net):null,!active?'조회기간 밖':m.error?'조회 오류':m.a===null || m.b===null?'자료 일부 없음':'정상']);});}
+  if(annualView){lines.push([],['연도','월','전년 비교월','연령','성별','전입','전출','순이동','전년 전입','전년 전출','전년 순이동','순이동 증감','자료 상태']);
+    annualView.current.months.forEach((m,i)=>{const p=annualView.prior.months[i],active=i<result.limit;lines.push([result.months[i].slice(0,4),Number(result.months[i].slice(4)),result.priorMonths[i],age,sex,active?m.a:null,active?m.b:null,active?m.net:null,p.a,p.b,p.net,active?M.difference(m.net,p.net):null,!active?'조회기간 밖':m.error?'조회 오류':m.a===null || m.b===null?'자료 일부 없음':'정상']);});}
   const csv=lines.map(row=>row.map(v=>'"'+String(v ?? '').replaceAll('"','""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='jeju-migration-'+period+'-'+$('age').value+'-'+$('sex').value+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);

@@ -71,3 +71,20 @@ test('Apps Script monthly routing, cache and health capabilities work without di
   assert.equal(JSON.parse(b.context.doGet({parameter:{month:'202313'}}).text).ok,false);
   assert(!b.context.doGet({parameter:{callback:'alert(1)'}}).text.startsWith('alert'));
 });
+test('custom periods include both endpoints and roll December into January',()=>{
+  assert.deepEqual(M.monthRange('2025-11','2026-02','2026-10'),['202511','202512','202601','202602']);
+  assert.deepEqual(M.monthRange('2026-09','2026-09','2026-10'),['202609']);
+  assert.equal(M.monthRange('2024-01','2026-10','2026-10').length,34);
+  assert.throws(()=>M.monthRange('2026-09','2026-08','2026-10'),/빠를/);
+  assert.throws(()=>M.monthRange('2023-12','2024-01','2026-10'),/2024/);
+  assert.throws(()=>M.monthRange('2026-10','2026-11','2026-10'),/지난달/);
+  assert.throws(()=>M.monthRange('2025-13','2026-02','2026-10'),/선택/);
+});
+test('custom period reports include all months beyond a calendar year, including missing months',()=>{
+  const slots=Array.from({length:15},()=>({data:data([row('11',2),row('12',3)])}));
+  const report=M.periodReport(slots,15,'all','both');
+  assert.equal(report.months.length,15);assert.equal(report.a,150);assert.equal(report.countA,15);
+  slots[14]={error:'unpublished'};
+  const missing=M.periodReport(slots,15,'all','both');
+  assert.equal(missing.a,null);assert.equal(missing.countA,14);assert.equal(missing.months[14].error,'unpublished');
+});
