@@ -8,7 +8,7 @@
     if (!item || item.state !== 'ok') return null;
     if (age === 'all') return sex === 'both' ? (Number.isSafeInteger(item.all) ? item.all : null)
       : (Number.isSafeInteger(item.total?.[sex]) ? item.total[sex] : null);
-    const pair = age === 'youth' ? item.youth : item.ageBands?.[age];
+    const pair = age === 'youth1939' ? item.youth1939 : age === 'youth' ? item.youth : item.ageBands?.[age];
     return sex === 'both' ? sum(pair || []) : (Number.isSafeInteger(pair?.[sex]) ? pair[sex] : null);
   }
   function reason(item, value) {

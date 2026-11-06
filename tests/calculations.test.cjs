@@ -52,7 +52,7 @@ function response(row,code='0',count=1){return {getResponseCode:()=>200,getConte
 test('Apps Script parses actual Response/head/items format and age boundaries 10–99',()=>{
   const {context}=backend();const row=ageRow();let parsed=context.parse_(response(row));
   assert.equal(parsed.ageBands['10'][0],145);assert.equal(parsed.ageBands['90'][1],1890);
-  assert.equal(parsed.youth[0],590);assert.equal(parsed.all,357);
+  assert.equal(parsed.youth[0],590);assert.equal(parsed.youth1939[0],609);assert.equal(parsed.youth1939[1],1218);assert.equal(parsed.all,357);
   delete row.male99AgeNmprCnt;parsed=context.parse_(response(row));
   assert.equal(parsed.ageBands['90'][0],null);assert.equal(parsed.ageBands['90'][1],1890);
   assert.equal(parsed.ageBands['20'][0],245);
@@ -105,4 +105,16 @@ test('map boundary codes match the API and include the verified merged region an
   assert(regions.some(r=>r.code==='12'&&r.name==='전남광주통합특별시'));
   assert(regions.some(r=>r.code==='50'));assert(!regions.some(r=>r.code==='29'||r.code==='46'));
   assert(regions.every(r=>r.d.startsWith('M') && !/NaN|undefined/.test(r.d)));
+});
+
+test('youth 19–39 is inclusive and never reuses the legacy 20–39 value',()=>{
+  assert.equal(M.read({state:'ok',youth1939:[19,39]},'youth1939','both'),58);
+  assert.equal(M.read({state:'ok',youth1939:[19,39]},'youth1939','0'),19);
+  assert.equal(M.read({state:'ok',youth:[20,39]},'youth1939','both'),null);
+  const {context}=backend();const row=ageRow();
+  row.male18AgeNmprCnt='99999';row.male40AgeNmprCnt='99999';
+  assert.equal(context.parse_(response(row)).youth1939[0],609);
+  delete row.male19AgeNmprCnt;
+  const parsed=context.parse_(response(row));assert.equal(parsed.youth1939[0],null);assert.equal(parsed.youth1939[1],1218);
+  assert.equal(parsed.youth[0],590);
 });

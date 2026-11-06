@@ -1,19 +1,20 @@
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const metric=(n)=>({state:'ok',all:n*2,total:[n,n],youth:[n*2,n*2],ageBands:Object.fromEntries(Array.from({length:9},(_,i)=>[String((i+1)*10),[n+i,n+i+1]]))});
+const metric=(n)=>({state:'ok',all:n*2,total:[n,n],youth:[n*2,n*2],youth1939:[n+2,n+3],ageBands:Object.fromEntries(Array.from({length:9},(_,i)=>[String((i+1)*10),[n+i,n+i+1]]))});
 function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(month>='202607'?['11','12']:['11','29','46']).map((code,i)=>({code,name:code==='11'?'서울':code==='12'?'전남광주통합특별시':code==='29'?'광주':'전남',inbound:metric(i+10),outbound:metric(i+11)}))};}
 (async()=>{
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
   const errors=[];const page=await browser.newPage({acceptDownloads:true,hasTouch:true});page.on('pageerror',e=>errors.push(e.message));
   const setValue=async(id,value)=>page.locator('#'+id).evaluate((el,v)=>{el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));},value);
-  let calls=[],failMonth='',hold=false;
+  let calls=[],failMonth='',hold=false,legacyYouth=false;
   await page.addInitScript(()=>localStorage.setItem('jeju-gas-url','https://script.google.com/macros/s/legacy/exec'));
   await page.route('https://script.google.com/**',async route=>{
     const u=new URL(route.request().url()),month=u.searchParams.get('month');assert(!u.pathname.includes('/legacy/'));
     if(hold && month)await new Promise(r=>setTimeout(r,800));
     if(month)calls.push(month);
     const payload=u.searchParams.has('action')?{ok:true,keyConfigured:true,features:['ageBands']}:month===failMonth?{ok:false,error:'테스트용 조회 오류'}:fixture(month);
+    if(legacyYouth && month && payload.rows)for(const row of payload.rows)for(const flow of ['inbound','outbound'])delete row[flow].youth1939;
     try{await route.fulfill({contentType:'application/javascript',body:`${u.searchParams.get('callback')}(${JSON.stringify(payload)});`});}catch(_){}
   });
   // Simulate an old cached unversioned calculation script.
@@ -85,12 +86,18 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   await page.selectOption('#sex','1');assert.equal(await page.locator('#inbound').innerText(),'498');
   assert((await inboundMap.locator('.map-readout').innerText()).includes('171명'));
   assert.equal(calls.length,9);
+  await page.selectOption('#age','youth1939');await page.selectOption('#sex','both');
+  assert.equal(await page.locator('#inbound').innerText(),'671');assert((await page.locator('#label').innerText()).includes('청년(19세~39세)'));assert.equal(calls.length,9);
   await page.selectOption('#age','all');await page.selectOption('#sex','both');
   console.log('PASS age and sex filters reuse selected-period data');
   const downloadPromise=page.waitForEvent('download');await page.click('#csv');const download=await downloadPromise;
   const csv=fs.readFileSync(await download.path(),'utf8');
   assert(csv.includes('202512~202608'));assert(csv.includes('202601'));assert(csv.includes('광주·전남(통합 기준)'));assert(!csv.includes('전년'));
   console.log('PASS CSV contains only the selected period');
+  legacyYouth=true;await setValue('start','2025-10');await setValue('end','2025-10');await page.selectOption('#age','youth1939');await page.click('#load');
+  await page.waitForFunction(()=>!document.querySelector('#load').disabled);assert.equal(await page.locator('#inbound').innerText(),'—');
+  assert((await page.locator('#status').innerText()).includes('데이터 연결 업데이트'));
+  legacyYouth=false;await page.selectOption('#age','all');console.log('PASS old 20–39 data cannot be mislabeled as youth 19–39');
   const before=calls.length;await setValue('start','2026-08');await setValue('end','2026-07');await page.click('#load');
   assert.equal(calls.length,before);assert.equal(await page.locator('#end').evaluate(e=>e.validity.customError),true);
   await setValue('end','2026-08');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);

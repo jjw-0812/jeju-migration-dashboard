@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'jeju-age-bands-20261105-v6';
+const BUILD_VERSION = 'jeju-youth1939-20261106-v7';
 const API = 'https://apis.data.go.kr/1741000/ppltnDataStus/selectPpltnDataStus';
 const JEJU = '5000000000';
 const REGIONS = [
@@ -14,7 +14,7 @@ function doGet(e) {
     return output_({ok:false,error:'잘못된 콜백입니다.'}, '');
   }
   try {
-    if (p.action === 'health') return output_({ok:true,keyConfigured:!!key_(),version:BUILD_VERSION,features:['ageBands']}, callback);
+    if (p.action === 'health') return output_({ok:true,keyConfigured:!!key_(),version:BUILD_VERSION,features:['ageBands','youth1939']}, callback);
     const month = String(p.month || '');
     const latest = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMM');
     if (!/^20\d{2}(0[1-9]|1[0-2])$/.test(month) || month < '202401' || month >= latest) {
@@ -174,9 +174,14 @@ function parse_(response) {
       const counts = [ageBands['20'][sex],ageBands['30'][sex]];
       return counts.some(n=>n===null) ? null : counts[0]+counts[1];
     });
+    // Keep legacy youth (20-39) for older clients; expose 19-39 separately.
+    const youth1939 = ['male','feml'].map((sex,i) => {
+      const counts = [read([sex+'19AgeNmprCnt']),ageBands['20'][i],ageBands['30'][i]];
+      return counts.some(n=>n===null) ? null : counts.reduce((a,b)=>a+b,0);
+    });
     const all = read(['totNmprCnt','totPpltnCnt','totalNmprCnt','totalPpltnCnt']) ?? (total.includes(null) ? null : total[0]+total[1]);
     if (all === null && [...total,...youth].every(n=>n===null)) return {state:'error',reason:'인구수 응답 필드 확인 필요'};
-    return {state:'ok',all,total,youth,ageBands};
+    return {state:'ok',all,total,youth,youth1939,ageBands};
   } catch (_) {
     return {state:'error',reason:'HTTP '+status+' / 응답 해석 실패'};
   }
@@ -189,6 +194,7 @@ function testApi() {
     name:r.name,inbound:r.inbound.state,outbound:r.outbound.state,
     inboundReason:r.inbound.reason,outboundReason:r.outbound.reason,
     inboundTotal:r.inbound.all,outboundTotal:r.outbound.all,
-    inboundAgeBands:r.inbound.ageBands,outboundAgeBands:r.outbound.ageBands
+    inboundAgeBands:r.inbound.ageBands,outboundAgeBands:r.outbound.ageBands,
+    inboundYouth1939:r.inbound.youth1939,outboundYouth1939:r.outbound.youth1939
   }))},null,2));
 }
