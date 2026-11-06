@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>제주 인구이동 대시보드</title>
 <link rel="preload" href="assets/fonts/NotoSansKR-ui.5ba2582865cc.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="theme.css?v=94358da72391">
+<link rel="stylesheet" href="theme.css?v=03e4e44f9845">
 </head>
 <body>
 <main>
@@ -24,9 +24,9 @@
 </section>
 <p id="result-context" class="result-context" hidden></p>
 <section class="cards" aria-label="선택 기간 이동 요약">
-<div class="card"><div class="card-title">제주 전입</div><div class="card-body"><strong id="inbound">—</strong><small id="inCoverage"></small></div></div>
-<div class="card"><div class="card-title">제주 전출</div><div class="card-body"><strong id="outbound">—</strong><small id="outCoverage"></small></div></div>
-<div class="card"><div class="card-title">순이동</div><div class="card-body"><strong id="net">—</strong><small>전입 − 전출</small></div></div>
+<div class="card"><div class="card-title">제주 전입</div><div class="card-body"><img class="summary-icon" src="assets/icons/inbound.svg" width="80" height="80" alt="" aria-hidden="true"><div class="card-metric"><strong id="inbound">—</strong><small id="inCoverage"></small></div></div></div>
+<div class="card"><div class="card-title">제주 전출</div><div class="card-body"><img class="summary-icon" src="assets/icons/outbound.svg" width="80" height="80" alt="" aria-hidden="true"><div class="card-metric"><strong id="outbound">—</strong><small id="outCoverage"></small></div></div></div>
+<div class="card"><div class="card-title">순이동</div><div class="card-body"><img class="summary-icon" src="assets/icons/net.svg" width="80" height="80" alt="" aria-hidden="true"><div class="card-metric"><strong id="net">—</strong><small>전입 − 전출</small></div></div></div>
 </section>
 <section class="panel" id="comparison-panel" hidden>
 <div class="toolbar"><h2>동일기간 연도별 비교</h2><label>비교 지표<select id="comparison-metric"><option value="net">순이동</option><option value="a">전입</option><option value="b">전출</option></select></label></div>

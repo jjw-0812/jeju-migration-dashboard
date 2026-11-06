@@ -93,3 +93,10 @@ a{color:var(--blue-dark);text-underline-offset:3px}
 .comparison-legend span{display:inline-flex;align-items:center;gap:7px}.comparison-legend i{display:inline-block;width:22px;border-top:3px solid}
 #age-definition{color:var(--blue-dark);margin-top:8px}
 @media(max-width:700px){#comparison-panel .toolbar{align-items:flex-start}#comparison-panel .toolbar label{font-size:13px}#query>label:has(#compare){grid-column:1/-1}.result-context{font-size:12px}}
+
+.card-body{display:grid;grid-template-columns:80px minmax(0,1fr);gap:18px;align-items:center;min-height:140px}
+.summary-icon{display:block;width:80px;height:80px;object-fit:contain;flex-shrink:0}
+.card-metric{min-width:0;display:grid;gap:8px}.card-metric strong{display:block}.card-metric small{display:block}
+@media(min-width:701px) and (max-width:1100px){.card-body{grid-template-columns:60px minmax(0,1fr);gap:10px}.summary-icon{width:60px;height:60px}.card-metric strong{font-size:32px}}
+@media(max-width:700px){.card-body{grid-template-columns:72px minmax(0,1fr);gap:18px;min-height:124px}.summary-icon{width:72px;height:72px}.card-metric strong{font-size:36px}}
+@media(min-width:701px) and (max-width:1000px){.cards{grid-template-columns:1fr}.card-body{grid-template-columns:80px minmax(0,1fr);gap:18px}.summary-icon{width:80px;height:80px}.card-metric strong{font-size:36px}}
