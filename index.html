@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>제주 인구이동 대시보드</title>
 <link rel="preload" href="assets/fonts/NotoSansKR-ui.5ba2582865cc.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="theme.css?v=069901047e41">
+<link rel="stylesheet" href="theme.css?v=94358da72391">
 </head>
 <body>
 <main>
@@ -13,17 +13,28 @@
 <form id="query">
 <div class="month-control"><span class="field-label" id="start-label">시작연월</span><input id="start" type="hidden" min="2024-01"><button type="button" class="month-trigger" id="start-dial" aria-labelledby="start-label start-display" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false"><span id="start-display"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
 <div class="month-control"><span class="field-label" id="end-label">종료연월</span><input id="end" type="hidden" min="2024-01"><button type="button" class="month-trigger" id="end-dial" aria-labelledby="end-label end-display" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false"><span id="end-display"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+<label>비교 <select id="compare"><option value="1">선택 기간만</option><option value="2">2개년 비교</option><option value="3">3개년 비교</option></select></label>
 <label>연령 <select id="age"><option value="all">전체 연령</option><option value="youth1939">청년(19세~39세)</option><option value="10">10대 (10~19세)</option><option value="20">20대 (20~29세)</option><option value="30">30대 (30~39세)</option><option value="40">40대 (40~49세)</option><option value="50">50대 (50~59세)</option><option value="60">60대 (60~69세)</option><option value="70">70대 (70~79세)</option><option value="80">80대 (80~89세)</option><option value="90">90대 (90~99세)</option></select></label>
 <label>성별 <select id="sex"><option value="both">전체</option><option value="0">남성</option><option value="1">여성</option></select></label>
 <div class="query-actions"><button class="p-solid" id="load" type="submit">조회하기</button><button type="button" id="demo">예시 보기</button><button type="button" id="cancel" hidden>조회 중단</button></div>
 </form>
 <p id="api-status" role="status">API 연결 확인 중…</p>
 <p id="status" role="status"></p>
+<p id="age-definition" class="note" hidden>청년은 만 19세부터 39세까지 포함해 집계합니다.</p>
 </section>
+<p id="result-context" class="result-context" hidden></p>
 <section class="cards" aria-label="선택 기간 이동 요약">
 <div class="card"><div class="card-title">제주 전입</div><div class="card-body"><strong id="inbound">—</strong><small id="inCoverage"></small></div></div>
 <div class="card"><div class="card-title">제주 전출</div><div class="card-body"><strong id="outbound">—</strong><small id="outCoverage"></small></div></div>
 <div class="card"><div class="card-title">순이동</div><div class="card-body"><strong id="net">—</strong><small>전입 − 전출</small></div></div>
+</section>
+<section class="panel" id="comparison-panel" hidden>
+<div class="toolbar"><h2>동일기간 연도별 비교</h2><label>비교 지표<select id="comparison-metric"><option value="net">순이동</option><option value="a">전입</option><option value="b">전출</option></select></label></div>
+<div class="table-wrap"><table><thead><tr><th scope="col">집계기간</th><th scope="col">전입</th><th scope="col">전출</th><th scope="col">순이동</th><th scope="col">확인 개월</th></tr></thead><tbody data-comparison-summary></tbody></table></div>
+<div class="comparison-legend" data-comparison-legend></div>
+<div class="chart-wrap" data-comparison-chart></div>
+<div class="table-wrap"><table><thead data-comparison-head></thead><tbody data-comparison-months></tbody></table></div>
+<p class="note sub">기준기간과 1년 전·2년 전의 같은 기간을 비교합니다. 자료가 없는 월은 0명으로 계산하지 않습니다. 아래 지도·시도별 표는 기준기간의 자료입니다. 2024년 이전 자료는 현재 연결에서 지원하지 않습니다.</p>
 </section>
 <section class="panel" id="period-panel" hidden>
 <h2>월별 현황</h2>
@@ -68,10 +79,11 @@
 <div class="picker-actions"><button type="button" data-picker-cancel>취소</button><button type="button" class="p-solid" data-picker-confirm>선택 완료</button></div>
 </dialog>
 
-<script src="migration.js?v=dcf850f0dde5"></script>
+<script src="migration.js?v=b0bb38c6252e"></script>
 <script src="map-regions.js?v=38d99cdcf145"></script>
 <script src="region-map.js?v=bdedbb398e65"></script>
 <script src="month-dial.js?v=53635901fcce"></script>
+<script src="comparison.js?v=65511c124c4f"></script>
 <script>
 'use strict';
 // Public Apps Script web-app URL. No API key belongs in this file.
@@ -135,7 +147,7 @@ function validateRange() {
 $('start').oninput=$('end').oninput=validateRange;
 function queryPlan() {
   const months=M.monthRange($('start').value,$('end').value,previous);
-  return {limit:months.length,months};
+  return {limit:months.length,months,periods:M.comparisonPeriods(months,Number($('compare').value))};
 }
 const monthLabel=month=>month.slice(0,4)+'년 '+Number(month.slice(4))+'월';
 const periodLabel=(months,limit)=>monthLabel(months[0])+(limit>1?' ~ '+monthLabel(months[limit-1]):'');
@@ -148,19 +160,27 @@ checkConnection();
 $('query').onsubmit=async e=>{
   e.preventDefault();if(controller)return;
   controller=new AbortController();const signal=controller.signal;
-  const controls=['start','end','load','demo'];
+  const controls=['start','end','compare','load','demo'];
   controls.forEach(id=>$(id).disabled=true);$('cancel').hidden=false;$('csv').disabled=true;
   try {
     const plan=queryPlan();
-    const current=Array(plan.months.length).fill(null);
-    for(let i=0;i<plan.months.length;i++) {
-      const month=plan.months[i];
-      $('status').textContent=`기간 조회 ${i}/${plan.months.length} · ${monthLabel(month)} 조회 중…`;
-      try {current[i]={data:await fetchMonth(month,signal)};}
-      catch(err){if(err.name==='AbortError')throw err;current[i]={error:err.message};}
+    const periods=plan.periods.map(period=>({...period,slots:Array(period.months.length).fill(null)}));
+    const jobs=new Map();
+    periods.forEach(period=>period.months.forEach((month,index)=>{
+      if(month<'202401'){period.slots[index]={unavailable:true,error:'지원 범위 이전'};return;}
+      if(!jobs.has(month))jobs.set(month,[]);
+      jobs.get(month).push({period,index});
+    }));
+    let completed=0;
+    for(const [month,targets] of jobs) {
+      $('status').textContent=`기간 조회 ${completed}/${jobs.size} · ${monthLabel(month)} 조회 중…`;
+      let slot;
+      try {slot={data:await fetchMonth(month,signal)};}
+      catch(err){if(err.name==='AbortError')throw err;slot={error:err.message};}
+      targets.forEach(({period,index})=>period.slots[index]=slot);completed++;
     }
     if(signal.aborted)throw new DOMException('조회 중단','AbortError');
-    result={...plan,current};
+    result={...plan,periods,current:periods[0].slots};
     render();
   } catch(err) {
     $('status').textContent=err.name==='AbortError'?'조회를 중단했습니다. 이전 조회 결과는 유지됩니다.':err.message;
@@ -169,7 +189,10 @@ $('query').onsubmit=async e=>{
     $('csv').disabled=!result || !!result.demo;
   }
 };
-$('age').onchange=$('sex').onchange=()=>{if(result)render();};
+$('age').onchange=$('sex').onchange=()=>{
+  $('age-definition').hidden=$('age').value!=='youth1939';
+  if(result)render();
+};
 function demoMonth(month) {
   const merged=month>='202607';
   const regions=[['11','서울'],['26','부산'],['27','대구'],['28','인천'],['30','대전'],['31','울산'],['36','세종'],['41','경기'],['51','강원'],['43','충북'],['44','충남'],['52','전북'],['47','경북'],['48','경남'],...(merged?[['12','전남광주통합특별시']]:[['29','광주'],['46','전남']])];
@@ -184,7 +207,8 @@ function demoMonth(month) {
 $('demo').onclick=()=>{
   let plan;
   try {plan=queryPlan();} catch(err){$('status').textContent=err.message;return;}
-  result={...plan,demo:true,current:plan.months.map(month=>({data:demoMonth(month)}))};
+  const periods=plan.periods.map(p=>({...p,slots:p.months.map(month=>month>='202401'?{data:demoMonth(month)}:{unavailable:true,error:'지원 범위 이전'})}));
+  result={...plan,periods,demo:true,current:periods[0].slots};
   render();
 };
 function appendRow(target,values) {
@@ -226,10 +250,15 @@ function render() {
   if(!result)return;
   const age=$('age').value,sex=$('sex').value;
   const filter=$('age').selectedOptions[0].text+' · '+$('sex').selectedOptions[0].text;
+  $('age-definition').hidden=age!=='youth1939';
   periodView=M.periodReport(result.current,result.limit,age,sex);
   currentRows=periodView.rows.slice().sort((a,b)=>(b.a ?? -1)-(a.a ?? -1));
   const period=periodLabel(result.months,result.limit);
-  $('period-panel').hidden=false;
+  const comparing=result.periods.length>1;
+  $('period-panel').hidden=comparing;
+  ComparisonUI.render($('comparison-panel'),result.periods,age,sex);
+  $('result-context').hidden=false;
+  $('result-context').textContent=(comparing?'기준기간 · ':'')+period+' · '+filter;
   $('region-title').textContent='시도별 누계';
   $('label').textContent=period+' · '+filter+' · 광주·전남은 통합 기준 합산';
   $('period-label').textContent=period+' · '+filter;
@@ -265,6 +294,7 @@ $('csv').onclick=()=>{
     ...currentRows.map(r=>[period,age,sex,r.name,r.a,r.b,r.net,r.ins,r.outs]),
     [],['연월','연령','성별','전입','전출','순이동','자료 상태'],
     ...periodView.months.map((m,i)=>[result.months[i],age,sex,m.a,m.b,m.net,m.error?'조회 오류':m.a===null || m.b===null?'자료 일부 없음':'정상'])];
+  if(result.periods.length>1)lines.push(...ComparisonUI.csvRows(result.periods,$('age').value,$('sex').value,age,sex));
   const csv=lines.map(row=>row.map(v=>'"'+String(v ?? '').replaceAll('"','""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='jeju-migration-'+period+'-'+$('age').value+'-'+$('sex').value+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);

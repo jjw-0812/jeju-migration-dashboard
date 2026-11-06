@@ -58,7 +58,7 @@
       const slot = slots[i];
       const rows = monthRows(slot?.data,age,sex,true);
       const total = totals(rows);
-      return {...total,rows,error:slot?.error || '',asOf:slot?.data?.asOf};
+      return {...total,rows,error:slot?.error || '',unavailable:!!slot?.unavailable,asOf:slot?.data?.asOf};
     });
     const selected = months.slice(0,limit);
     const a = sum(selected.map(m=>m.a)), b = sum(selected.map(m=>m.b));
@@ -78,7 +78,12 @@
   function annualReport(slots, limit, age, sex) {
     return periodReport(Array.from({length:12},(_,i)=>slots[i] || null),limit,age,sex);
   }
-  const api = {sum,difference,read,reason,monthRows,totals,annualReport,periodReport,monthRange};
+  function comparisonPeriods(months, count) {
+    if (![1,2,3].includes(count) || !months.length) throw Error('비교 연도를 확인해 주세요.');
+    return Array.from({length:count},(_,offset)=>({offset,
+      months:months.map(month=>String(Number(month.slice(0,4))-offset)+month.slice(4))}));
+  }
+  const api = {sum,difference,read,reason,monthRows,totals,annualReport,periodReport,monthRange,comparisonPeriods};
   if (typeof module !== 'undefined' && module.exports) module.exports=api;
   else root.MigrationData=api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

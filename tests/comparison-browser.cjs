@@ -1,0 +1,42 @@
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+const metric=n=>({state:'ok',all:n*100,total:[n*55,n*45],youth:[n*20,n*15],youth1939:[n*22,n*18],ageBands:{'20':[n*11,n*8],'30':[n*9,n*7]}});
+function fixture(month){const n=(Number(month.slice(0,4))-2020)*10+Number(month.slice(4));return {ok:true,month,asOf:'2026-11-06T00:00:00Z',rows:(month>='202607'?[['11','서울',n,n+1],['12','전남광주통합특별시',2*n+5,2*n+7]]:[['11','서울',n,n+1],['29','광주',n+2,n+3],['46','전남',n+3,n+4]]).map(([code,name,a,b])=>({code,name,inbound:metric(a),outbound:metric(b)}))};}
+(async()=>{
+ const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+ const page=await browser.newPage({acceptDownloads:true}),errors=[],calls=[];let failMonth='';page.on('pageerror',e=>errors.push(e.message));
+ await page.route('https://script.google.com/**',async r=>{const u=new URL(r.request().url()),m=u.searchParams.get('month');if(m)calls.push(m);const data=!m?{ok:true,keyConfigured:true,features:['ageBands','youth1939']}:m===failMonth?{ok:false,error:'fixture failure'}:fixture(m);await r.fulfill({contentType:'application/javascript',body:`${u.searchParams.get('callback')}(${JSON.stringify(data)});`});});
+ await page.goto('http://127.0.0.1:8000/');
+ const period=async(start,end)=>{for(const [id,v] of [['start',start],['end',end]])await page.locator('#'+id).evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},v);};
+ const load=async()=>{await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);};
+ await period('2026-07','2026-08');await page.selectOption('#age','youth1939');await page.selectOption('#compare','3');await load();
+ assert.equal(await page.locator('#age option:checked').innerText(),'청년(19세~39세)');assert(await page.locator('#age-definition').isVisible());
+ assert.equal(await page.locator('#inbound').innerText(),'16,600');assert.equal(await page.locator('#comparison-panel').isVisible(),true);assert.equal(await page.locator('#period-panel').isVisible(),false);
+ const rows=page.locator('[data-comparison-summary] tr');assert.equal(await rows.count(),3);
+ for(const [i,total] of [[0,'16,600'],[1,'14,200'],[2,'11,800']])assert.equal(await rows.nth(i).locator('td').first().innerText(),total);
+ assert.deepEqual(calls,['202607','202608','202507','202508','202407','202408']);
+ assert((await page.locator('#result-context').innerText()).includes('기준기간'));
+ await page.selectOption('#comparison-metric','a');const monthly=page.locator('[data-comparison-months] tr');assert.equal(await monthly.count(),2);
+ assert.deepEqual(await monthly.first().locator('td').allInnerTexts(),['8,240','7,040','5,840']);
+ assert((await page.locator('[data-comparison-chart] title').first().textContent()).includes('전입'));
+ console.log('PASS 3-year matched-month comparisons and youth 19–39, distinct from legacy 20–39');
+ await page.selectOption('#sex','1');assert.equal(await page.locator('#inbound').innerText(),'7,470');assert.equal(calls.length,6);
+ const downloadPromise=page.waitForEvent('download');await page.click('#csv');const download=await downloadPromise;const csv=fs.readFileSync(await download.path(),'utf8');
+ assert(csv.includes('동일기간 비교'));assert(csv.includes('202407~202408'));assert(csv.includes('"7470"'));assert(csv.includes('청년(19세~39세)'));
+ console.log('PASS shared filters and full comparison CSV with correct metric values');
+ await page.selectOption('#compare','1');await load();assert.equal(await page.locator('#comparison-panel').isVisible(),false);assert(await page.locator('#period-panel').isVisible());assert.equal(calls.length,6);
+ await page.selectOption('#compare','2');await period('2025-12','2026-01');await load();assert.equal(await rows.count(),2);
+ const comparisonMonth=page.locator('[data-comparison-months] tr');assert((await comparisonMonth.first().locator('td').nth(1).getAttribute('title')).includes('2024년 12월'));assert((await comparisonMonth.last().locator('td').nth(1).getAttribute('title')).includes('2025년 1월'));
+ console.log('PASS optional single-period mode and 2-year cross-year alignment');
+ failMonth='202505';await period('2026-05','2026-05');await page.selectOption('#compare','3');await load();
+ assert.equal(await rows.nth(1).locator('td').first().innerText(),'—');assert((await rows.nth(1).innerText()).includes('0/1개월'));
+ failMonth='';await period('2024-01','2024-02');await load();assert.equal(await rows.nth(1).locator('td').first().innerText(),'—');assert.equal(await rows.nth(2).locator('td').first().innerText(),'—');assert(!calls.some(m=>m<'202401'));
+ console.log('PASS failed and unsupported prior months remain missing, never zero');
+ await period('2025-01','2026-03');await page.selectOption('#age','all');await load();
+ assert.equal(await page.locator('[data-comparison-months] tr').count(),15);
+ assert.equal(calls.length,new Set(calls).size+1); // Only the explicitly failed 202505 request was retried.
+ console.log('PASS overlapping multi-year ranges reuse monthly data without duplicate successful requests');
+ await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.locator('#comparison-panel').screenshot({path:'/tmp/jeju-comparison-mobile.png'});
+ await page.setViewportSize({width:1440,height:1100});await page.locator('#comparison-panel').screenshot({path:'/tmp/jeju-comparison-desktop.png'});
+ assert.deepEqual(errors,[]);await browser.close();console.log('PASS responsive comparison layout and no JavaScript errors');
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -87,3 +87,9 @@ a{color:var(--blue-dark);text-underline-offset:3px}
 .wheel-option.is-current{color:var(--blue-dark);font-size:20px;font-weight:700}.picker-preview{text-align:center;color:var(--blue-dark);font-size:16px;font-weight:600;margin:18px 0}
 .picker-actions{display:flex;gap:10px}.picker-actions button{flex:1}.picker-actions .p-solid{font-size:15px;min-height:46px;padding:12px}
 @media(max-width:700px){#query>.month-control{display:grid;gap:6px}.field-label{font-size:13px}.month-trigger{width:100%;font-size:14px;padding:10px;min-width:0}.month-picker{padding:22px}}
+
+.result-context{margin:22px 2px -14px;color:var(--muted);font-size:13px}
+.comparison-legend{display:flex;flex-wrap:wrap;gap:10px 22px;margin:20px 0 0;font-size:12px;color:var(--muted)}
+.comparison-legend span{display:inline-flex;align-items:center;gap:7px}.comparison-legend i{display:inline-block;width:22px;border-top:3px solid}
+#age-definition{color:var(--blue-dark);margin-top:8px}
+@media(max-width:700px){#comparison-panel .toolbar{align-items:flex-start}#comparison-panel .toolbar label{font-size:13px}#query>label:has(#compare){grid-column:1/-1}.result-context{font-size:12px}}

@@ -118,3 +118,12 @@ test('youth 19–39 is inclusive and never reuses the legacy 20–39 value',()=>
   const parsed=context.parse_(response(row));assert.equal(parsed.youth1939[0],null);assert.equal(parsed.youth1939[1],1218);
   assert.equal(parsed.youth[0],590);
 });
+test('two/three-year periods shift each month by exactly one/two years across December',()=>{
+  const periods=M.comparisonPeriods(['202512','202601','202602'],3);
+  assert.deepEqual(periods.map(p=>p.months),[
+    ['202512','202601','202602'],['202412','202501','202502'],['202312','202401','202402']
+  ]);
+  assert.equal(M.comparisonPeriods(['202609'],1).length,1);
+  assert.equal(M.comparisonPeriods(['202609'],2).length,2);
+  assert.throws(()=>M.comparisonPeriods(['202609'],4));
+});
