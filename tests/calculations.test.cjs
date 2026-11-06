@@ -88,3 +88,21 @@ test('custom period reports include all months beyond a calendar year, including
   const missing=M.periodReport(slots,15,'all','both');
   assert.equal(missing.a,null);assert.equal(missing.countA,14);assert.equal(missing.months[14].error,'unpublished');
 });
+test('map colors distinguish missing, zero and maxima using a shared scale',()=>{
+  const map=require('../region-map.js');
+  assert.equal(map.maximum([{a:50,b:100},{a:null,b:0}]),100);
+  assert.equal(map.maximum([{a:null,b:null}]),0);
+  assert.equal(map.color(null,100,'a'),map.missing);
+  assert.notEqual(map.color(0,100,'a'),map.missing);
+  assert.equal(map.color(100,100,'a'),'#99000d');
+  assert.equal(map.color(100,100,'b'),'#08306b');
+  assert.equal(map.color(0,0,'a'),map.color(0,100,'a'));
+});
+test('map boundary codes match the API and include the verified merged region and Jeju',()=>{
+  const context={window:{}};vm.createContext(context);vm.runInContext(fs.readFileSync('map-regions.js','utf8'),context);
+  const regions=context.window.JejuMapRegions.regions;
+  assert.equal(regions.length,16);assert.equal(new Set(regions.map(r=>r.code)).size,16);
+  assert(regions.some(r=>r.code==='12'&&r.name==='전남광주통합특별시'));
+  assert(regions.some(r=>r.code==='50'));assert(!regions.some(r=>r.code==='29'||r.code==='46'));
+  assert(regions.every(r=>r.d.startsWith('M') && !/NaN|undefined/.test(r.d)));
+});
