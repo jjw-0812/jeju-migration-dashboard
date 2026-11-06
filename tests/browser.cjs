@@ -39,7 +39,7 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   assert.equal(await inboundMap.locator('.map-scale-end').innerText(),'398명');
   assert.equal(await outboundMap.locator('.map-scale-end').innerText(),'398명');
   assert.equal(await inboundMap.locator('[data-region="26"] path').first().getAttribute('fill'),'#d9dfe3');
-  assert.equal(await inboundMap.locator('[data-region="50"] path').first().getAttribute('fill'),'#e5eee8');
+  assert.equal(await inboundMap.locator('[data-region="50"] path').first().getAttribute('fill'),'#edf1f5');
   await inboundMap.locator('[data-region="12"]').focus();
   assert((await inboundMap.locator('.map-readout').innerText()).includes('366명'));
   assert((await outboundMap.locator('.map-readout').innerText()).includes('398명'));

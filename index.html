@@ -3,61 +3,27 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>제주 인구이동 대시보드</title>
-<style>
-:root{color-scheme:light;--ink:#162d2a;--muted:#526a65;--green:#086950;--blue:#265a8e;--line:#dce8e3;--bg:#f2f7f4}*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto}
-header{background:#123e35;color:#fff;border-radius:24px;padding:32px clamp(20px,5vw,54px);border-bottom:5px solid #6ec5a3}
-h1{font-size:clamp(27px,5vw,45px);letter-spacing:-.05em;margin:4px 0}header p{color:#d6eee6;margin:4px 0}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.14em;color:#a3e0c8}
-.panel,.card{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:16px}
-form,.toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:12px}label{display:grid;gap:5px;font-weight:650}
-input,select,button{font:inherit;border:1px solid #a8c2b7;border-radius:8px;padding:9px 12px;min-height:42px;background:white;color:var(--ink)}
-button{cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:default}
-[hidden]{display:none!important}.chart-wrap{overflow:auto}.chart-wrap svg{width:100%;min-width:640px;height:auto}.period-table{min-width:630px}.note{margin:12px 0 0;font-size:13px}#cancel{border-color:#9b3e26}/* lib ui-solid 0a04d1594742b2e5f413efcaa196d79c */
-.p-solid{padding:12px 24px;border:0;border-radius:10px;background:#8b5cf6;color:#111111;font:600 15px/1.2 Inter,Pretendard,sans-serif;cursor:pointer;transition:background .15s,transform .1s}
-.p-solid:hover:not(:disabled){background:#7a51d8}
-.p-solid:active:not(:disabled){transform:scale(.97)}
-.p-solid:focus-visible{outline:2px solid #8b5cf6;outline-offset:3px}
-@media(prefers-reduced-motion:reduce){.p-solid{animation:none;transition:none}}
-#api-status{color:var(--green);margin-bottom:0}#status:empty{display:none}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card strong{display:block;font-size:clamp(22px,4vw,36px);font-variant-numeric:tabular-nums}
-small,.sub,footer{color:var(--muted)}h2{margin:0;font-size:20px}.toolbar{justify-content:space-between;align-items:center}
-.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:right;font-variant-numeric:tabular-nums}th:first-child,td:first-child{text-align:left}thead{background:#edf5f0}
-.pos{color:var(--green)}.neg{color:#9b3e26}.bar{display:inline-block;height:6px;border-radius:4px;background:currentColor;vertical-align:middle;margin-left:7px}#status{min-height:24px;margin-bottom:0}footer{margin:18px 2px}a{color:var(--green)}
-@media(max-width:560px){main{margin:16px auto}.cards{gap:6px}.card{padding:10px}.panel{padding:14px}}
-
-.map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
-.flow-map{border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0;background:#fbfdfc}
-.flow-map h3{font-size:18px;margin:0}.flow-map[data-map-flow="a"] h3{color:#a20e23}.flow-map[data-map-flow="b"] h3{color:#164982}
-.map-heading{display:flex;justify-content:space-between;gap:12px;align-items:center}.map-heading label{font-size:12px;font-weight:400}.map-heading select{max-width:160px;min-height:36px;padding:5px 8px;font-size:13px}
-.map-canvas{background:#f0f6f7;border-radius:10px;margin-top:12px}.map-canvas svg{width:100%;height:auto;display:block}
-.map-region{cursor:pointer;outline:none}.map-region>path:first-of-type{stroke:#fff;stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.map-region.is-selected>path:first-of-type,.map-region:focus-visible>path:first-of-type{stroke:#263f3c;stroke-width:1.2}
-.map-leader{stroke:#6a7d80;stroke-width:.8;pointer-events:none}.map-label{font:600 12px system-ui,sans-serif;fill:#213c38;stroke:#fff;stroke-width:3px;stroke-linejoin:round;paint-order:stroke;cursor:pointer}
-.map-readout{font-size:14px;min-height:44px;margin:10px 0 0;font-variant-numeric:tabular-nums}
-.map-ramp{height:9px;border-radius:4px;margin-top:12px}.map-scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:3px}
-.map-keys{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}.map-key{display:inline-flex;gap:5px;align-items:center}.map-key i{width:12px;height:12px;border:1px solid #a8b4b9;border-radius:2px;background:#d9dfe3}.map-key:last-child i{background:#e5eee8}
-.map-source{font-size:11px;color:var(--muted);margin-bottom:0}
-@media(max-width:700px){.map-grid{grid-template-columns:1fr}.flow-map{padding:12px}}
-</style>
+<link rel="preload" href="assets/fonts/NotoSansKR-ui.5ba2582865cc.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="theme.css?v=4704a9464103">
 </head>
 <body>
 <main>
 <header><div class="eyebrow">JEJU · MIGRATION MONITOR</div><h1>제주 인구이동 대시보드</h1><p>타 시도와 제주 사이의 전입·전출·순이동 · 기간별·연령대별 현황</p></header>
-<section class="panel" aria-label="조회 설정">
+<section class="panel query-panel" aria-label="조회 설정">
 <form id="query">
 <label>시작연월 <input id="start" type="month" min="2024-01" required></label>
 <label>종료연월 <input id="end" type="month" min="2024-01" required></label>
 <label>연령 <select id="age"><option value="all">전체 연령</option><option value="youth">만 20~39세</option><option value="10">10대 (10~19세)</option><option value="20">20대 (20~29세)</option><option value="30">30대 (30~39세)</option><option value="40">40대 (40~49세)</option><option value="50">50대 (50~59세)</option><option value="60">60대 (60~69세)</option><option value="70">70대 (70~79세)</option><option value="80">80대 (80~89세)</option><option value="90">90대 (90~99세)</option></select></label>
 <label>성별 <select id="sex"><option value="both">전체</option><option value="0">남성</option><option value="1">여성</option></select></label>
-<button class="p-solid" id="load" type="submit">조회하기</button><button type="button" id="demo">예시 보기</button><button type="button" id="cancel" hidden>조회 중단</button>
+<div class="query-actions"><button class="p-solid" id="load" type="submit">조회하기</button><button type="button" id="demo">예시 보기</button><button type="button" id="cancel" hidden>조회 중단</button></div>
 </form>
 <p id="api-status" role="status">API 연결 확인 중…</p>
 <p id="status" role="status"></p>
 </section>
 <section class="cards" aria-label="선택 기간 이동 요약">
-<div class="card">전입<strong id="inbound">—</strong><small id="inCoverage"></small></div>
-<div class="card">전출<strong id="outbound">—</strong><small id="outCoverage"></small></div>
-<div class="card">순이동<strong id="net">—</strong><small>전입 − 전출</small></div>
+<div class="card"><div class="card-title">제주 전입</div><div class="card-body"><strong id="inbound">—</strong><small id="inCoverage"></small></div></div>
+<div class="card"><div class="card-title">제주 전출</div><div class="card-body"><strong id="outbound">—</strong><small id="outCoverage"></small></div></div>
+<div class="card"><div class="card-title">순이동</div><div class="card-body"><strong id="net">—</strong><small>전입 − 전출</small></div></div>
 </section>
 <section class="panel" id="period-panel" hidden>
 <h2>월별 현황</h2>
@@ -96,7 +62,7 @@ small,.sub,footer{color:var(--muted)}h2{margin:0;font-size:20px}.toolbar{justify
 </main>
 <script src="migration.js?v=e7d476a3023b"></script>
 <script src="map-regions.js?v=38d99cdcf145"></script>
-<script src="region-map.js?v=d5a329a297ac"></script>
+<script src="region-map.js?v=bdedbb398e65"></script>
 <script>
 'use strict';
 // Public Apps Script web-app URL. No API key belongs in this file.
@@ -230,11 +196,11 @@ function drawChart(current,labels) {
   svg.style.minWidth=width+'px';
   const x=i=>65+(labels.length===1?0:i*(width-130)/(labels.length-1)),y=n=>215-(n-low)/range*175;
   function line(x1,y1,x2,y2,color){const el=document.createElementNS(ns,'line');Object.entries({x1,y1,x2,y2,stroke:color}).forEach(([k,v])=>el.setAttribute(k,v));svg.append(el);}
-  function text(x,y,value){const el=document.createElementNS(ns,'text');el.setAttribute('x',x);el.setAttribute('y',y);el.setAttribute('font-size','12');el.setAttribute('fill','#526a65');el.textContent=value;svg.append(el);}
-  line(55,y(0),width-45,y(0),'#a8c2b7');text(5,y(high)+4,display(high));if(low!==high)text(5,y(low)+4,display(low));
+  function text(x,y,value){const el=document.createElementNS(ns,'text');el.setAttribute('x',x);el.setAttribute('y',y);el.setAttribute('font-size','12');el.setAttribute('fill','#697482');el.textContent=value;svg.append(el);}
+  line(55,y(0),width-45,y(0),'#d4deed');text(5,y(high)+4,display(high));if(low!==high)text(5,y(low)+4,display(low));
   for(let i=0;i<labels.length;i++)text(x(i)-18,245,labels[i]);
   {
-    const color='#086950';
+    const color='#2862f5';
     let previous=null;
     for(let i=0;i<current.length;i++){
       const n=current[i].net;if(!Number.isSafeInteger(n)){previous=null;continue;}

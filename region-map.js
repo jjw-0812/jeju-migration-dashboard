@@ -1,7 +1,7 @@
 /* Choropleth maps use the same period totals as the table. No external map service. */
 (function(root){
   'use strict';
-  const missing='#d9dfe3', excluded='#e5eee8';
+  const missing='#d9dfe3', excluded='#edf1f5';
   const palettes={a:[[255,245,240],[153,0,13]],b:[[239,246,255],[8,48,107]]};
   const valid=n=>Number.isSafeInteger(n) && n>=0;
   function maximum(rows){return Math.max(0,...rows.flatMap(r=>[r.a,r.b]).filter(valid));}
