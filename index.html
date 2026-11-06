@@ -4,15 +4,15 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>제주 인구이동 대시보드</title>
 <link rel="preload" href="assets/fonts/NotoSansKR-ui.5ba2582865cc.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="theme.css?v=4704a9464103">
+<link rel="stylesheet" href="theme.css?v=069901047e41">
 </head>
 <body>
 <main>
 <header><div class="eyebrow">JEJU · MIGRATION MONITOR</div><h1>제주 인구이동 대시보드</h1><p>타 시도와 제주 사이의 전입·전출·순이동 · 기간별·연령대별 현황</p></header>
 <section class="panel query-panel" aria-label="조회 설정">
 <form id="query">
-<label>시작연월 <input id="start" type="month" min="2024-01" required></label>
-<label>종료연월 <input id="end" type="month" min="2024-01" required></label>
+<div class="month-control"><span class="field-label" id="start-label">시작연월</span><input id="start" type="hidden" min="2024-01"><button type="button" class="month-trigger" id="start-dial" aria-labelledby="start-label start-display" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false"><span id="start-display"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+<div class="month-control"><span class="field-label" id="end-label">종료연월</span><input id="end" type="hidden" min="2024-01"><button type="button" class="month-trigger" id="end-dial" aria-labelledby="end-label end-display" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false"><span id="end-display"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
 <label>연령 <select id="age"><option value="all">전체 연령</option><option value="youth">만 20~39세</option><option value="10">10대 (10~19세)</option><option value="20">20대 (20~29세)</option><option value="30">30대 (30~39세)</option><option value="40">40대 (40~49세)</option><option value="50">50대 (50~59세)</option><option value="60">60대 (60~69세)</option><option value="70">70대 (70~79세)</option><option value="80">80대 (80~89세)</option><option value="90">90대 (90~99세)</option></select></label>
 <label>성별 <select id="sex"><option value="both">전체</option><option value="0">남성</option><option value="1">여성</option></select></label>
 <div class="query-actions"><button class="p-solid" id="load" type="submit">조회하기</button><button type="button" id="demo">예시 보기</button><button type="button" id="cancel" hidden>조회 중단</button></div>
@@ -60,9 +60,18 @@
 </section>
 <footer>단위 명 · 연령은 만 나이 · 제주 내부 이동 제외 · 자료 없음과 조회 오류는 —로 표시 · <a href="https://www.data.go.kr/data/15108093/openapi.do">행정안전부 지역별 인구이동 현황</a></footer>
 </main>
+<dialog id="month-picker" class="month-picker" aria-labelledby="month-picker-title" aria-describedby="month-picker-help">
+<h2 id="month-picker-title">연월 선택</h2><p id="month-picker-help" class="picker-help">위아래로 밀거나 스크롤해 선택하세요.</p>
+<div class="dial-labels" aria-hidden="true"><span>연도</span><span>월</span></div>
+<div class="dial-frame"><div class="dial-selection" aria-hidden="true"></div><div class="month-wheel" data-wheel="year" role="listbox" tabindex="0" aria-label="연도"></div><div class="month-wheel" data-wheel="month" role="listbox" tabindex="0" aria-label="월"></div></div>
+<p id="month-picker-preview" class="picker-preview" role="status" aria-live="polite"></p>
+<div class="picker-actions"><button type="button" data-picker-cancel>취소</button><button type="button" class="p-solid" data-picker-confirm>선택 완료</button></div>
+</dialog>
+
 <script src="migration.js?v=e7d476a3023b"></script>
 <script src="map-regions.js?v=38d99cdcf145"></script>
 <script src="region-map.js?v=bdedbb398e65"></script>
+<script src="month-dial.js?v=53635901fcce"></script>
 <script>
 'use strict';
 // Public Apps Script web-app URL. No API key belongs in this file.
@@ -79,6 +88,7 @@ const latestYear = Number(previous.slice(0,4));
 $('start').max = $('end').max = previous;
 $('start').value = String(latestYear)+'-01';
 $('end').value = previous;
+MonthDial.mount($('start'),$('end'),previous);
 const endpoint = DEFAULT_ENDPOINT;
 let result=null, currentRows=[], periodView=null, controller=null;
 const monthCache=new Map();
@@ -118,8 +128,9 @@ async function fetchMonth(month,signal) {
   return data;
 }
 function validateRange() {
-  $('end').setCustomValidity($('start').value && $('end').value && $('start').value>$('end').value
-    ? '종료연월은 시작연월보다 빠를 수 없습니다.' : '');
+  const invalid=$('start').value && $('end').value && $('start').value>$('end').value;
+  $('end').setCustomValidity(invalid?'종료연월은 시작연월보다 빠를 수 없습니다.':'');
+  $('end-dial').setAttribute('aria-invalid',String(!!invalid));
 }
 $('start').oninput=$('end').oninput=validateRange;
 function queryPlan() {

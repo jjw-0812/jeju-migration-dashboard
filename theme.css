@@ -72,3 +72,18 @@ a{color:var(--blue-dark);text-underline-offset:3px}
 @media(max-width:1100px){main{width:calc(100% - 48px)}.cards{gap:16px}.card-body{padding:24px 18px}.card strong{font-size:36px}}
 @media(max-width:700px){main{width:calc(100% - 32px);margin:22px auto}header{padding-bottom:20px;margin-bottom:20px}.panel{padding:20px 16px;margin-top:20px;border-radius:16px}.query-panel{padding:20px;margin-top:0}#query{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}#query>label{display:grid;gap:6px;font-size:13px}#query input,#query select{width:100%;min-width:0;font-size:14px}.query-actions{grid-column:1/-1;gap:8px}.query-actions button{flex:1;padding-left:12px;padding-right:12px;font-size:14px}.p-solid{min-height:46px}.cards{grid-template-columns:1fr;gap:14px;margin-top:20px}.card{border-radius:16px}.card-title{min-height:54px;font-size:18px;padding:12px}.card-body{min-height:94px;padding:20px 24px}.card strong{font-size:38px}h2{font-size:19px}.map-grid{grid-template-columns:1fr;gap:16px}.flow-map{padding:14px}.map-heading select{max-width:140px}.toolbar{gap:12px}.sub{font-size:13px}th,td{padding:12px}footer{font-size:11px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button,.p-solid{animation:none;transition:none}}
+
+.month-control{display:flex;align-items:center;gap:10px;min-width:0}.field-label{font-size:14px;font-weight:600;white-space:nowrap}
+.month-trigger{width:164px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:400;white-space:nowrap}
+.month-trigger svg{color:#728099;flex-shrink:0}.month-trigger[aria-invalid="true"]{border-color:#b5314b}
+.month-picker{width:min(380px,calc(100% - 32px));border:1px solid var(--line);border-radius:22px;padding:26px;background:#fff;color:var(--ink);font-family:var(--font);box-shadow:0 18px 70px #193a702e;max-height:calc(100dvh - 32px);overflow:auto}
+.month-picker::backdrop{background:#16233d66}.month-picker h2{font-size:20px}.picker-help{font-size:12px;color:var(--muted);margin:8px 0 20px}
+.dial-labels{display:grid;grid-template-columns:1fr 1fr;text-align:center;color:var(--muted);font-size:12px;margin-bottom:6px}
+.dial-frame{display:grid;grid-template-columns:1fr 1fr;position:relative;background:#fff;border-radius:14px;overflow:hidden}
+.dial-selection{position:absolute;top:88px;height:44px;left:0;right:0;border-top:1px solid #d7e5ff;border-bottom:1px solid #d7e5ff;background:#eff5ff;pointer-events:none}
+.month-wheel{height:220px;overflow-y:auto;padding:88px 0;scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;position:relative;outline:none;cursor:grab;user-select:none;mask-image:linear-gradient(to bottom,transparent,#0005 18%,#000 40%,#000 60%,#0005 82%,transparent)}
+.month-wheel::-webkit-scrollbar{display:none}.month-wheel:active{cursor:grabbing}.month-wheel:focus-visible{background:#2862f50a;outline:2px solid var(--blue);outline-offset:-2px;border-radius:10px}
+.wheel-option{height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:18px;font-weight:400;color:#7c8798;cursor:pointer;line-height:1}
+.wheel-option.is-current{color:var(--blue-dark);font-size:20px;font-weight:700}.picker-preview{text-align:center;color:var(--blue-dark);font-size:16px;font-weight:600;margin:18px 0}
+.picker-actions{display:flex;gap:10px}.picker-actions button{flex:1}.picker-actions .p-solid{font-size:15px;min-height:46px;padding:12px}
+@media(max-width:700px){#query>.month-control{display:grid;gap:6px}.field-label{font-size:13px}.month-trigger{width:100%;font-size:14px;padding:10px;min-width:0}.month-picker{padding:22px}}

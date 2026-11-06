@@ -5,7 +5,8 @@ const metric=(n)=>({state:'ok',all:n*2,total:[n,n],youth:[n*2,n*2],ageBands:Obje
 function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(month>='202607'?['11','12']:['11','29','46']).map((code,i)=>({code,name:code==='11'?'서울':code==='12'?'전남광주통합특별시':code==='29'?'광주':'전남',inbound:metric(i+10),outbound:metric(i+11)}))};}
 (async()=>{
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
-  const errors=[];const page=await browser.newPage({acceptDownloads:true});page.on('pageerror',e=>errors.push(e.message));
+  const errors=[];const page=await browser.newPage({acceptDownloads:true,hasTouch:true});page.on('pageerror',e=>errors.push(e.message));
+  const setValue=async(id,value)=>page.locator('#'+id).evaluate((el,v)=>{el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));},value);
   let calls=[],failMonth='',hold=false;
   await page.addInitScript(()=>localStorage.setItem('jeju-gas-url','https://script.google.com/macros/s/legacy/exec'));
   await page.route('https://script.google.com/**',async route=>{
@@ -22,8 +23,34 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   await page.goto('http://127.0.0.1:8000/');
   await page.waitForFunction(()=>document.querySelector('#api-status').textContent==='API 연결됨');
   assert.equal(await page.locator('#mode,#year,#month,#settings,#endpoint').count(),0);
-  assert(await page.locator('#start').isVisible());assert(await page.locator('#end').isVisible());
-  await page.fill('#start','2025-12');await page.fill('#end','2026-08');await page.click('#load');
+  assert(await page.locator('#start-dial').isVisible());assert(await page.locator('#end-dial').isVisible());
+  const dialog=page.locator('#month-picker'),yearWheel=dialog.getByRole('listbox',{name:'연도',exact:true}),monthWheel=dialog.getByRole('listbox',{name:'월',exact:true});
+  const originalStart=await page.locator('#start').inputValue();
+  await page.click('#start-dial');assert(await dialog.isVisible());
+  await yearWheel.press('Home');assert((await page.locator('#month-picker-preview').innerText()).includes('2024년'));
+  await page.keyboard.press('Escape');assert.equal(await page.locator('#start').inputValue(),originalStart);
+  assert.equal(await page.locator('#start-dial').evaluate(el=>el===document.activeElement),true);
+  await page.click('#start-dial');await yearWheel.press('Home');await yearWheel.press('ArrowDown');await monthWheel.press('End');
+  await dialog.locator('[data-picker-confirm]').click();assert.equal(await page.locator('#start').inputValue(),'2025-12');
+  assert.equal(await page.locator('#start-display').innerText(),'2025년 12월');
+  await page.click('#end-dial');await yearWheel.press('Home');
+  assert.equal(await monthWheel.getByRole('option').count(),1);assert.equal(await monthWheel.getByRole('option').innerText(),'12월');
+  await yearWheel.press('End');await monthWheel.press('Home');for(let i=0;i<7;i++)await monthWheel.press('ArrowDown');
+  await dialog.locator('[data-picker-confirm]').click();assert.equal(await page.locator('#end').inputValue(),'2026-08');
+  assert.equal(calls.length,0);
+  console.log('PASS year/month keyboard wheels, bounds, confirm, Escape and focus restoration');
+  await page.click('#end-dial');const wheelBox=await monthWheel.boundingBox();
+  await monthWheel.hover();await page.mouse.wheel(0,-60);await page.waitForTimeout(350);
+  assert.notEqual(await monthWheel.locator('[aria-selected="true"]').innerText(),'8월');
+  await dialog.locator('[data-picker-cancel]').click();assert.equal(await page.locator('#end').inputValue(),'2026-08');
+  await page.click('#end-dial');const dragBox=await monthWheel.boundingBox();
+  await page.mouse.move(dragBox.x+dragBox.width/2,dragBox.y+dragBox.height/2);await page.mouse.down();
+  await page.mouse.move(dragBox.x+dragBox.width/2,dragBox.y+dragBox.height/2-88,{steps:8});await page.mouse.up();
+  await page.waitForTimeout(150);assert.equal(await monthWheel.locator('[aria-selected="true"]').innerText(),'10월');
+  await dialog.locator('[data-picker-cancel]').click();
+  console.log('PASS mouse wheel and drag, latest-month clamp, cancel without committing');
+
+  await setValue('start','2025-12');await setValue('end','2026-08');await page.click('#load');
   await page.waitForFunction(()=>!document.querySelector('#load').disabled);
   assert.equal(await page.locator('#period-rows tr').count(),9);assert.equal(await page.locator('#rows tr').count(),2);
   assert.equal(await page.locator('#inbound').innerText(),'546');
@@ -64,22 +91,22 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   const csv=fs.readFileSync(await download.path(),'utf8');
   assert(csv.includes('202512~202608'));assert(csv.includes('202601'));assert(csv.includes('광주·전남(통합 기준)'));assert(!csv.includes('전년'));
   console.log('PASS CSV contains only the selected period');
-  const before=calls.length;await page.fill('#start','2026-08');await page.fill('#end','2026-07');await page.click('#load');
+  const before=calls.length;await setValue('start','2026-08');await setValue('end','2026-07');await page.click('#load');
   assert.equal(calls.length,before);assert.equal(await page.locator('#end').evaluate(e=>e.validity.customError),true);
-  await page.fill('#end','2026-08');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);
+  await setValue('end','2026-08');await page.click('#load');await page.waitForFunction(()=>!document.querySelector('#load').disabled);
   assert.equal(await page.locator('#period-rows tr').count(),1);assert.equal(await page.locator('#inbound').innerText(),'42');
   console.log('PASS reversed period rejected; single-month period and cache work');
-  failMonth='202411';await page.fill('#start','2024-01');await page.fill('#end','2025-03');await page.click('#load');
+  failMonth='202411';await setValue('start','2024-01');await setValue('end','2025-03');await page.click('#load');
   await page.waitForFunction(()=>!document.querySelector('#load').disabled);
   assert.equal(await page.locator('#period-rows tr').count(),15);assert.equal(await page.locator('#inbound').innerText(),'—');
   assert.equal(await page.locator('#inCoverage').innerText(),'확인 14 / 15개월');
   assert((await page.locator('#period-rows tr').nth(10).innerText()).includes('조회 오류'));
   assert(!calls.some(m=>m<'202401'));
   console.log('PASS >12 months and missing data stay distinct from zero');
-  failMonth='';hold=true;await page.fill('#start','2024-11');await page.fill('#end','2024-11');await page.click('#load');await page.click('#cancel');
+  failMonth='';hold=true;await setValue('start','2024-11');await setValue('end','2024-11');await page.click('#load');assert.equal(await page.locator('#start-dial').isDisabled(),true);assert.equal(await page.locator('#end-dial').isDisabled(),true);await page.click('#cancel');
   await page.waitForFunction(()=>!document.querySelector('#load').disabled);assert((await page.locator('#status').innerText()).includes('중단'));
   await page.waitForTimeout(1200);console.log('PASS cancellation and late JSONP responses');
-  await page.setViewportSize({width:390,height:844});await page.fill('#start','2025-12');await page.fill('#end','2026-08');await page.click('#demo');
+  await page.setViewportSize({width:390,height:844});await setValue('start','2025-12');await setValue('end','2026-08');await page.click('#demo');
   assert.equal(await page.locator('#period-rows tr').count(),9);assert.equal(await page.locator('#csv').isDisabled(),true);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
   const cards=await page.locator('.flow-map').evaluateAll(els=>els.map(e=>({top:e.getBoundingClientRect().top,left:e.getBoundingClientRect().left})));
@@ -89,6 +116,20 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   await page.screenshot({path:'/tmp/jeju-map-mobile.png',fullPage:true});
   await page.setViewportSize({width:1280,height:1100});
   await page.locator('#map-panel').screenshot({path:'/tmp/jeju-maps-desktop.png'});
-  assert.deepEqual(errors,[]);console.log('PASS mobile layout, demo, no JavaScript errors');
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.locator('#end-dial').isDisabled(),false);
+  await page.locator('#end-dial').tap();
+  const touchBox=await monthWheel.boundingBox(),touchX=touchBox.x+touchBox.width/2,touchY=touchBox.y+touchBox.height/2;
+  const initialScroll=await monthWheel.evaluate(el=>el.scrollTop),client=await page.context().newCDPSession(page);
+  await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchX,y:touchY}]});
+  for(let i=1;i<=5;i++){await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchX,y:touchY-i*16}]});await page.waitForTimeout(30);}
+  await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(400);
+  assert((await monthWheel.evaluate(el=>el.scrollTop))>initialScroll);
+  assert(await dialog.evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight;}));
+  await page.screenshot({path:'/tmp/jeju-month-dial-mobile.png'});
+  await dialog.locator('[data-picker-cancel]').tap();assert.equal(await page.locator('#end').inputValue(),'2026-08');
+  await page.setViewportSize({width:1280,height:1000});await page.click('#start-dial');
+  await dialog.screenshot({path:'/tmp/jeju-month-dial-desktop.png'});await page.keyboard.press('Escape');
+  assert.deepEqual(errors,[]);console.log('PASS touch swipe, mobile dialog, demo, no JavaScript errors');
   await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
