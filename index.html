@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>제주 인구이동 대시보드</title>
 <link rel="preload" href="assets/fonts/NotoSansKR-ui.5ba2582865cc.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="theme.css?v=03e4e44f9845">
+<link rel="stylesheet" href="theme.css?v=d5985c894307">
 </head>
 <body>
 <main>
@@ -51,18 +51,22 @@
 <article class="flow-map" data-map-flow="a">
 <div class="map-heading"><div><h3>제주 전입</h3><small>각 시도 → 제주</small></div><label>지역<select aria-label="제주 전입 지도 지역 선택"></select></label></div>
 <div class="map-canvas"></div>
+<div class="map-total"><span>선택 기간 전입 합계</span><strong class="map-total-value">—</strong></div><p class="map-total-note"></p>
 <p class="map-readout" role="status" aria-live="polite"></p>
+<p class="map-legend-label">색상 범례 · 두 지도 공통 기준 (합계 아님)</p>
 <div class="map-ramp" aria-hidden="true"></div><div class="map-scale"><span class="map-scale-start"></span><span class="map-scale-end"></span></div>
 </article>
 <article class="flow-map" data-map-flow="b">
 <div class="map-heading"><div><h3>제주 전출</h3><small>제주 → 각 시도</small></div><label>지역<select aria-label="제주 전출 지도 지역 선택"></select></label></div>
 <div class="map-canvas"></div>
+<div class="map-total"><span>선택 기간 전출 합계</span><strong class="map-total-value">—</strong></div><p class="map-total-note"></p>
 <p class="map-readout" role="status" aria-live="polite"></p>
+<p class="map-legend-label">색상 범례 · 두 지도 공통 기준 (합계 아님)</p>
 <div class="map-ramp" aria-hidden="true"></div><div class="map-scale"><span class="map-scale-start"></span><span class="map-scale-end"></span></div>
 </article>
 </div>
 <div class="map-keys"><span class="map-key"><i aria-hidden="true"></i>자료 없음</span><span class="map-key"><i aria-hidden="true"></i>제주 · 집계 제외</span></div>
-<p class="note sub">색이 진할수록 이동 인원이 많습니다. 두 지도는 같은 인원 범례를 사용합니다. 지역을 누르거나 키보드로 선택하면 인원을 확인할 수 있습니다. 광주·전남은 통합 기준입니다.</p>
+<p class="note sub">색이 진할수록 이동 인원이 많습니다. 합계는 각 지도 아래에 따로 표시하며, 색상 비교용 범례는 두 지도에 같은 기준을 사용합니다. 지역을 누르거나 키보드로 선택하면 인원을 확인할 수 있습니다. 광주·전남은 통합 기준입니다.</p>
 <p class="map-source">지도 경계: 통계청 SGIS · <a href="https://github.com/vuski/admdongkor">vuski/admdongkor</a> (2026.10, CC BY 4.0, 단순화·투영) · <a href="assets/MAP-DATA-LICENSE.txt">출처·이용 조건</a></p>
 </section>
 <section class="panel">
@@ -81,7 +85,7 @@
 
 <script src="migration.js?v=b0bb38c6252e"></script>
 <script src="map-regions.js?v=38d99cdcf145"></script>
-<script src="region-map.js?v=bdedbb398e65"></script>
+<script src="region-map.js?v=ad2c148614cc"></script>
 <script src="month-dial.js?v=53635901fcce"></script>
 <script src="comparison.js?v=65511c124c4f"></script>
 <script>

@@ -64,6 +64,9 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   assert.equal(await page.locator('#map-panel').isVisible(),true);
   assert.equal(await inboundMap.locator('.map-region').count(),16);
   assert.equal(await outboundMap.locator('.map-region').count(),16);
+  assert.equal(await inboundMap.locator('.map-total-value').innerText(),'546명');
+  assert.equal(await outboundMap.locator('.map-total-value').innerText(),'596명');
+  assert((await inboundMap.locator('.map-legend-label').innerText()).includes('합계 아님'));
   assert.equal(await inboundMap.locator('.map-scale-end').innerText(),'398명');
   assert.equal(await outboundMap.locator('.map-scale-end').innerText(),'398명');
   assert.equal(await inboundMap.locator('[data-region="26"] path').first().getAttribute('fill'),'#d9dfe3');
@@ -74,6 +77,7 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   assert.equal(await outboundMap.locator('select').inputValue(),'12');
   await inboundMap.locator('select').selectOption('11');
   assert((await inboundMap.locator('.map-readout').innerText()).includes('180명'));
+  assert.equal(await inboundMap.locator('.map-total-value').innerText(),'546명');
   assert((await outboundMap.locator('.map-readout').innerText()).includes('198명'));
   assert.notEqual(await inboundMap.locator('[data-region="11"] path').first().getAttribute('fill'),await outboundMap.locator('[data-region="11"] path').first().getAttribute('fill'));
   await inboundMap.locator('select').selectOption('50');
@@ -108,6 +112,7 @@ function fixture(month){return {ok:true,month,asOf:'2026-11-05T00:00:00Z',rows:(
   assert.equal(await page.locator('#period-rows tr').count(),15);assert.equal(await page.locator('#inbound').innerText(),'—');
   assert.equal(await page.locator('#inCoverage').innerText(),'확인 14 / 15개월');
   assert((await page.locator('#period-rows tr').nth(10).innerText()).includes('조회 오류'));
+  assert.equal(await inboundMap.locator('.map-total-value').innerText(),'—');
   assert(!calls.some(m=>m<'202401'));
   console.log('PASS >12 months and missing data stay distinct from zero');
   failMonth='';hold=true;await setValue('start','2024-11');await setValue('end','2024-11');await page.click('#load');assert.equal(await page.locator('#start-dial').isDisabled(),true);assert.equal(await page.locator('#end-dial').isDisabled(),true);await page.click('#cancel');

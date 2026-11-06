@@ -17,6 +17,7 @@
     const ns='http://www.w3.org/2000/svg',fmt=new Intl.NumberFormat('ko-KR');
     const rowByCode=new Map(rows.map(r=>[r.code,r]));
     const max=maximum(rows),known=rows.some(r=>valid(r.a)||valid(r.b));
+    const totals=root.MigrationData.totals(rows);
     const views=[];
     host.hidden=false;host.querySelector('.map-period').textContent=label;
     const node=(tag,attrs={},text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;return el;};
@@ -37,6 +38,10 @@
     }
     for(const flow of ['a','b']){
       const card=host.querySelector(`[data-map-flow="${flow}"]`),select=card.querySelector('select'),info=card.querySelector('.map-readout');
+      const total=totals[flow],count=flow==='a'?totals.countA:totals.countB;
+      card.querySelector('.map-total-value').textContent=valid(total)?fmt.format(total)+'명':'—';
+      card.querySelector('.map-total-note').textContent=totals.count
+        ?`확인 ${count}/${totals.count}개 지역${total===null?' · 일부 자료 없음':''}`:'자료 없음';
       select.replaceChildren();
       const first=document.createElement('option');first.value='';first.textContent='지역 선택';select.append(first);
       data.regions.forEach(region=>{const option=document.createElement('option');option.value=region.code;option.textContent=region.shortName;select.append(option);});
